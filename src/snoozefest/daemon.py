@@ -156,10 +156,18 @@ class Daemon:
     def _root_device_identifier(self) -> str:
         return self._config.mqtt_topic_prefix
 
+    def _is_dev_instance(self) -> bool:
+        prefix = self._config.mqtt_topic_prefix.lower()
+        client_id = self._config.mqtt_client_id.lower()
+        return prefix.endswith("_dev") or prefix.endswith("-dev") or "dev" in client_id
+
+    def _instance_name_prefix(self) -> str:
+        return "Snoozefest Dev" if self._is_dev_instance() else "Snoozefest"
+
     def _root_device(self) -> dict:
         return {
             "identifiers": [self._root_device_identifier()],
-            "name": "Snoozefest",
+            "name": self._instance_name_prefix(),
             "manufacturer": "GitHub Copilot",
             "model": "MQTT Alarm Scheduler",
         }
@@ -197,17 +205,15 @@ class Daemon:
     def _timer_device_identifier(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_device"
 
-    @staticmethod
-    def _alarm_label(alarm: dict, alarm_id: str) -> str:
+    def _alarm_label(self, alarm: dict, alarm_id: str) -> str:
         label = str(alarm.get("label") or "").strip()
         suffix = label or f"Alarm {alarm_id}"
-        return f"Snoozefest Alarm - {suffix}"
+        return f"{self._instance_name_prefix()} Alarm - {suffix}"
 
-    @staticmethod
-    def _timer_label(timer: dict, timer_id: str) -> str:
+    def _timer_label(self, timer: dict, timer_id: str) -> str:
         label = str(timer.get("label") or "").strip()
         suffix = label or f"Timer {timer_id}"
-        return f"Snoozefest Timer - {suffix}"
+        return f"{self._instance_name_prefix()} Timer - {suffix}"
 
     def _alarm_device(self, alarm: dict, alarm_id: str) -> dict:
         return {

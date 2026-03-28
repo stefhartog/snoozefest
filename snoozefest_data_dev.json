@@ -1,0 +1,15 @@
+{
+  "oneoffs": [],
+  "recurring": [],
+  "timers": [
+    {
+      "id": "1",
+      "label": "New Timer",
+      "duration_seconds": 300,
+      "started_at": "2026-03-28T11:18:19.556163+00:00",
+      "expires_at": "2026-03-28T11:18:19.556163+00:00",
+      "status": "dismissed"
+    }
+  ],
+  "active_alarms": []
+}

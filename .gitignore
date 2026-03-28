@@ -14,3 +14,8 @@ snoozefest_data.json
 
 # IDE noise
 .vscode/
+.idea/
+
+# Add-on build artifacts
+addon/config/
+addon/.buildx-cache/

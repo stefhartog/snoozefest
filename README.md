@@ -26,6 +26,24 @@ Run the daemon:
 snoozefest --config config.json run
 ```
 
+## Deployment
+
+### Local development (Windows/Mac/Linux)
+
+Use the quick start setup above for testing and local development. Creates a dev instance with `snoozefest_dev` MQTT namespace.
+
+### Production (Home Assistant Add-on)
+
+For persistent deployment on Home Assistant:
+
+1. Navigate to `addon/` folder
+2. Follow [addon/README.md](addon/README.md) for installation
+3. See [MIGRATION.md](MIGRATION.md) for importing dev state to production
+
+When deployed as an add-on, Snoozefest publishes to the `snoozefest` MQTT namespace (distinct from local dev instance).
+
+Both dev and production instances can coexist without conflict.
+
 ## Operating model
 
 - Fully local scheduler loop with atomic JSON writes.
