@@ -1,0 +1,207 @@
+type: custom:auto-entities
+card_param: cards
+card:
+  type: vertical-stack
+filter:
+  include:
+    - entity_id: switch.snoozefest_alarm_*
+      options:
+        type: custom:button-card
+        entity: this.entity_id
+        show_icon: false
+        show_state: false
+        name: |
+          [[[
+            try {
+              var eid = (entity && entity.entity_id) ? entity.entity_id : '';
+              var id = eid.replace('switch.snoozefest_alarm_', '');
+
+              var rawName = 'Alarm ' + id;
+              if (entity && entity.attributes && entity.attributes.friendly_name) {
+                rawName = String(entity.attributes.friendly_name);
+              }
+
+              var cleanName = rawName
+                .replace(/^Snoozefest\s*/i, '')
+                .replace(/^Snoozefest:\s*/i, '');
+
+              var match = cleanName.match(/^(.*)\s\((.*)\)$/);
+              if (match) {
+                var alarmLabel = match[1];
+                var schedule = match[2];
+
+                if (schedule.indexOf('-') >= 0) {
+                  var parts = schedule.split(' ');
+                  if (parts.length >= 2) {
+                    schedule = parts[1];
+                  }
+                }
+
+                var timeMatch = schedule.match(/^(\d{2}:\d{2})/);
+                if (timeMatch) {
+                  schedule = timeMatch[1];
+                }
+
+                cleanName = alarmLabel + ' (' + schedule + ')';
+              }
+
+              var statusId = 'sensor.snoozefest_alarm_' + id + '_status';
+              var etaId = 'sensor.snoozefest_alarm_' + id + '_eta';
+
+              var statusRaw = 'unknown';
+              if (states[statusId] && states[statusId].state) {
+                statusRaw = String(states[statusId].state);
+              }
+
+              var status = statusRaw;
+              if (statusRaw.length > 0) {
+                status = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1);
+              }
+
+              var eta = 'n/a';
+              if (states[etaId] && states[etaId].state) {
+                eta = String(states[etaId].state);
+              }
+
+              return cleanName + '  |  ' + status + '  |  ' + eta;
+            } catch (e) {
+              return 'Alarm  |  loading...';
+            }
+          ]]]
+        tap_action:
+          action: toggle
+        styles:
+          card:
+            - padding: 8px 12px
+            - border-radius: 10px
+            - transition: background-color 200ms ease
+            - background-color: |
+                [[[
+                  try {
+                    var eid = (entity && entity.entity_id) ? entity.entity_id : '';
+                    var id = eid.replace('switch.snoozefest_alarm_', '');
+                    var enabled = entity && entity.state === 'on';
+
+                    var statusId = 'sensor.snoozefest_alarm_' + id + '_status';
+                    var status = 'idle';
+                    if (states[statusId] && states[statusId].state) {
+                      status = String(states[statusId].state);
+                    }
+
+                    if (!enabled) return 'transparent';
+                    if (status === 'ringing') return 'rgba(220, 38, 38, 0.25)';
+                    if (status === 'snoozed') return 'rgba(34, 197, 94, 0.22)';
+                    return 'rgba(34, 197, 94, 0.22)';
+                  } catch (e) {
+                    return 'transparent';
+                  }
+                ]]]
+          grid:
+            - grid-template-areas: "\"n t s d r\""
+            - grid-template-columns: 1fr auto auto auto auto
+            - align-items: center
+          name:
+            - justify-self: start
+          custom_fields:
+            t:
+              - justify-self: end
+              - margin-right: 8px
+            s:
+              - justify-self: end
+              - margin-right: 8px
+            d:
+              - justify-self: end
+              - margin-right: 8px
+            r:
+              - justify-self: end
+        custom_fields:
+          t:
+            card:
+              type: custom:button-card
+              entity: this.entity_id
+              show_name: false
+              show_icon: false
+              show_state: true
+              tap_action:
+                action: toggle
+              styles:
+                card:
+                  - box-shadow: none
+                  - background: transparent
+                  - padding: 0
+          s:
+            card:
+              type: custom:button-card
+              entity: this.entity_id
+              icon: mdi:alarm-snooze
+              show_name: false
+              tap_action:
+                action: call-service
+                service: button.press
+                target:
+                  entity_id: |
+                    [[[
+                      try {
+                        var id = entity.entity_id.replace('switch.snoozefest_alarm_', '');
+                        return 'button.snoozefest_alarm_' + id + '_snooze';
+                      } catch (e) {
+                        return '';
+                      }
+                    ]]]
+              styles:
+                card:
+                  - box-shadow: none
+                  - background: transparent
+                  - padding: 0
+          d:
+            card:
+              type: custom:button-card
+              entity: this.entity_id
+              icon: mdi:alarm-off
+              show_name: false
+              tap_action:
+                action: call-service
+                service: button.press
+                target:
+                  entity_id: |
+                    [[[
+                      try {
+                        var id = entity.entity_id.replace('switch.snoozefest_alarm_', '');
+                        return 'button.snoozefest_alarm_' + id + '_dismiss';
+                      } catch (e) {
+                        return '';
+                      }
+                    ]]]
+              styles:
+                card:
+                  - box-shadow: none
+                  - background: transparent
+                  - padding: 0
+          r:
+            card:
+              type: custom:button-card
+              entity: this.entity_id
+              icon: mdi:trash-can-outline
+              show_name: false
+              tap_action:
+                action: call-service
+                service: button.press
+                target:
+                  entity_id: |
+                    [[[
+                      try {
+                        var id = entity.entity_id.replace('switch.snoozefest_alarm_', '');
+                        return 'button.snoozefest_alarm_' + id + '_remove';
+                      } catch (e) {
+                        return '';
+                      }
+                    ]]]
+              styles:
+                card:
+                  - box-shadow: none
+                  - background: transparent
+                  - padding: 0
+sort:
+  method: friendly_name
+grid_options:
+  columns: full

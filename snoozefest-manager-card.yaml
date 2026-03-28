@@ -1,0 +1,29 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    content: |
+      ## Snoozefest Manager
+
+  - type: horizontal-stack
+    cards:
+      - type: custom:button-card
+        entity: script.snoozefest_add_alarm
+        name: Add Alarm
+        icon: mdi:alarm-plus
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - border-radius: 12px
+            - padding: 12px
+
+      - type: custom:button-card
+        entity: script.snoozefest_add_timer
+        name: Add Timer
+        icon: mdi:timer-plus
+        tap_action:
+          action: more-info
+        styles:
+          card:
+            - border-radius: 12px
+            - padding: 12px

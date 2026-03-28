@@ -1,0 +1,2 @@
+[console_scripts]
+snoozefest = snoozefest.cli:main
