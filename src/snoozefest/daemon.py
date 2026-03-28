@@ -43,6 +43,7 @@ class Daemon:
 
         self._mqtt = MQTTClient(config=config, on_command=self._handle_command)
         self._running = False
+        self._active_request_id: Optional[str] = None
 
     def _timestamp_payload(self, dt: datetime) -> dict:
         utc_dt = dt.astimezone(timezone.utc)
@@ -96,6 +97,8 @@ class Daemon:
         ringing_timer_count = self._ringing_timer_count(state)
         self._mqtt.publish_state("alarms", state["alarms"])
         self._mqtt.publish_state("timers", state["timers"])
+        self._mqtt.publish_state("alarms_glance", self._alarms_glance_summary(state))
+        self._mqtt.publish_state("timers_glance", self._timers_glance_summary(state))
         # Clear deprecated aggregate active_alarm topic retained state.
         self._mqtt.publish_state("active_alarm", "")
         self._mqtt.publish_state("ringing_alarm_count", ringing_alarm_count)
@@ -145,9 +148,68 @@ class Daemon:
             "icon": "mdi:delete-sweep",
             "device": self._root_device(),
         }
+        online_payload = {
+            "name": "Online",
+            "unique_id": self._manager_online_object_id(),
+            "object_id": self._manager_online_object_id(),
+            "state_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_on": "true",
+            "payload_off": "false",
+            "device_class": "connectivity",
+            "device": self._root_device(),
+        }
+        ringing_alarm_count_payload = {
+            "name": "Ringing Alarm Count",
+            "unique_id": self._manager_ringing_alarm_count_object_id(),
+            "object_id": self._manager_ringing_alarm_count_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": f"{self._config.mqtt_topic_prefix}/state/ringing_alarm_count",
+            "icon": "mdi:alarm-light",
+            "device": self._root_device(),
+        }
+        ringing_timer_count_payload = {
+            "name": "Ringing Timer Count",
+            "unique_id": self._manager_ringing_timer_count_object_id(),
+            "object_id": self._manager_ringing_timer_count_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": f"{self._config.mqtt_topic_prefix}/state/ringing_timer_count",
+            "icon": "mdi:timer-alert",
+            "device": self._root_device(),
+        }
+        alarms_glance_payload = {
+            "name": "Alarms Glance",
+            "unique_id": self._manager_alarms_glance_object_id(),
+            "object_id": self._manager_alarms_glance_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": f"{self._config.mqtt_topic_prefix}/state/alarms_glance",
+            "icon": "mdi:format-list-bulleted",
+            "device": self._root_device(),
+        }
+        timers_glance_payload = {
+            "name": "Timers Glance",
+            "unique_id": self._manager_timers_glance_object_id(),
+            "object_id": self._manager_timers_glance_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": f"{self._config.mqtt_topic_prefix}/state/timers_glance",
+            "icon": "mdi:format-list-bulleted",
+            "device": self._root_device(),
+        }
         self._mqtt.publish(self._manager_add_alarm_discovery_topic(), add_alarm_payload, retain=True)
         self._mqtt.publish(self._manager_add_timer_discovery_topic(), add_timer_payload, retain=True)
         self._mqtt.publish(self._manager_purge_all_discovery_topic(), purge_all_payload, retain=True)
+        self._mqtt.publish(self._manager_online_discovery_topic(), online_payload, retain=True)
+        self._mqtt.publish(self._manager_ringing_alarm_count_discovery_topic(), ringing_alarm_count_payload, retain=True)
+        self._mqtt.publish(self._manager_ringing_timer_count_discovery_topic(), ringing_timer_count_payload, retain=True)
+        self._mqtt.publish(self._manager_alarms_glance_discovery_topic(), alarms_glance_payload, retain=True)
+        self._mqtt.publish(self._manager_timers_glance_discovery_topic(), timers_glance_payload, retain=True)
 
     @staticmethod
     def _ringing_alarm_count(state: dict) -> int:
@@ -156,6 +218,38 @@ class Daemon:
     @staticmethod
     def _ringing_timer_count(state: dict) -> int:
         return sum(1 for timer in state.get("timers", []) if str(timer.get("status")) == "ringing")
+
+    @staticmethod
+    def _truncate_glance(text: str, limit: int = 250) -> str:
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3] + "..."
+
+    def _alarms_glance_summary(self, state: dict) -> str:
+        alarms = state.get("alarms", [])
+        if not alarms:
+            return "No alarms"
+
+        parts: list[str] = []
+        for alarm in alarms:
+            alarm_id = str(alarm.get("id", "?"))
+            time_set = str(alarm.get("time", "--:--"))
+            status = str(alarm.get("status_normalized") or alarm.get("status") or "Unknown")
+            parts.append(f"A{alarm_id} {time_set} {status}")
+        return self._truncate_glance(" | ".join(parts))
+
+    def _timers_glance_summary(self, state: dict) -> str:
+        timers = state.get("timers", [])
+        if not timers:
+            return "No timers"
+
+        parts: list[str] = []
+        for timer in timers:
+            timer_id = str(timer.get("id", "?"))
+            label = str(timer.get("label", "Timer")).strip() or "Timer"
+            status = str(timer.get("status_normalized") or timer.get("status") or "Unknown")
+            parts.append(f"T{timer_id} {label} {status}")
+        return self._truncate_glance(" | ".join(parts))
 
     def _alarm_object_id(self, alarm_id: str) -> str:
         safe_alarm_id = alarm_id.replace("-", "_")
@@ -205,6 +299,51 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
             f"{self._manager_purge_all_object_id()}/config"
+        )
+
+    def _manager_online_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_online"
+
+    def _manager_online_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/binary_sensor/"
+            f"{self._manager_online_object_id()}/config"
+        )
+
+    def _manager_ringing_alarm_count_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_ringing_alarm_count"
+
+    def _manager_ringing_alarm_count_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._manager_ringing_alarm_count_object_id()}/config"
+        )
+
+    def _manager_ringing_timer_count_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_ringing_timer_count"
+
+    def _manager_ringing_timer_count_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._manager_ringing_timer_count_object_id()}/config"
+        )
+
+    def _manager_alarms_glance_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_alarms_glance"
+
+    def _manager_alarms_glance_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._manager_alarms_glance_object_id()}/config"
+        )
+
+    def _manager_timers_glance_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_timers_glance"
+
+    def _manager_timers_glance_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._manager_timers_glance_object_id()}/config"
         )
 
     def _alarm_device_identifier(self, alarm_id: str) -> str:
@@ -272,6 +411,36 @@ class Daemon:
 
     def _alarm_time_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_time"
+
+    def _alarm_time_set_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_time_set_display"
+
+    def _alarm_status_text_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_status_display"
+
+    def _alarm_time_set_discovery_topic_legacy_text(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._alarm_object_id(alarm_id)}_time_set/config"
+        )
+
+    def _alarm_status_text_discovery_topic_legacy_text(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._alarm_object_id(alarm_id)}_status_text/config"
+        )
+
+    def _alarm_time_set_discovery_topic_legacy_sensor(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_object_id(alarm_id)}_time_set/config"
+        )
+
+    def _alarm_status_text_discovery_topic_legacy_sensor(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_object_id(alarm_id)}_status_text/config"
+        )
 
     def _alarm_weekdays_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_weekdays"
@@ -349,6 +518,18 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/text/"
             f"{self._alarm_time_object_id(alarm_id)}/config"
+        )
+
+    def _alarm_time_set_discovery_topic(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_time_set_object_id(alarm_id)}/config"
+        )
+
+    def _alarm_status_text_discovery_topic(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_status_text_object_id(alarm_id)}/config"
         )
 
     def _alarm_time_discovery_topic_legacy(self, alarm_id: str) -> str:
@@ -504,6 +685,36 @@ class Daemon:
     def _timer_duration_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_duration"
 
+    def _timer_time_set_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_time_set_display"
+
+    def _timer_status_text_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_status_display"
+
+    def _timer_time_set_discovery_topic_legacy_text(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._timer_object_id(timer_id)}_time_set/config"
+        )
+
+    def _timer_status_text_discovery_topic_legacy_text(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._timer_object_id(timer_id)}_status_text/config"
+        )
+
+    def _timer_time_set_discovery_topic_legacy_sensor(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._timer_object_id(timer_id)}_time_set/config"
+        )
+
+    def _timer_status_text_discovery_topic_legacy_sensor(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._timer_object_id(timer_id)}_status_text/config"
+        )
+
     def _timer_snooze_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_snooze"
 
@@ -535,6 +746,18 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/text/"
             f"{self._timer_duration_object_id(timer_id)}/config"
+        )
+
+    def _timer_time_set_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._timer_time_set_object_id(timer_id)}/config"
+        )
+
+    def _timer_status_text_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._timer_status_text_object_id(timer_id)}/config"
         )
 
     def _timer_duration_discovery_topic_legacy(self, timer_id: str) -> str:
@@ -719,7 +942,13 @@ class Daemon:
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), label_payload, retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), duration_payload, retain=True)
+            self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_text(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_status_text_discovery_topic_legacy_text(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_sensor(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_status_text_discovery_topic_legacy_sensor(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_time_set_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_discovery_topic(timer_id), status_payload, retain=True)
+            self._mqtt.publish(self._timer_status_text_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), remaining_payload, retain=True)
             self._mqtt.publish(self._timer_remove_discovery_topic(timer_id), remove_payload, retain=True)
             self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), snooze_payload, retain=True)
@@ -741,7 +970,13 @@ class Daemon:
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_text(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_status_text_discovery_topic_legacy_text(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_sensor(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_status_text_discovery_topic_legacy_sensor(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_time_set_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_status_text_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remove_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), "", retain=True)
@@ -913,6 +1148,12 @@ class Daemon:
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), label_payload, retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic(alarm_id), time_payload, retain=True)
+            self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_text(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_status_text_discovery_topic_legacy_text(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_sensor(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_status_text_discovery_topic_legacy_sensor(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_set_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_status_text_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_weekdays_discovery_topic(alarm_id), "", retain=True)
             for wd, wd_payload in enumerate(weekday_switch_payloads):
                 self._mqtt.publish(self._alarm_weekday_discovery_topic(alarm_id, wd), wd_payload, retain=True)
@@ -952,6 +1193,12 @@ class Daemon:
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_legacy(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_text(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_status_text_discovery_topic_legacy_text(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_sensor(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_status_text_discovery_topic_legacy_sensor(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_set_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_status_text_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_weekdays_discovery_topic(alarm_id), "", retain=True)
             for wd in range(7):
                 self._mqtt.publish(self._alarm_weekday_discovery_topic(alarm_id, wd), "", retain=True)
@@ -1199,8 +1446,19 @@ class Daemon:
 
     # ------------------------------------------------------------------ MQTT command dispatch
 
+    @staticmethod
+    def _extract_request_id(payload: object) -> Optional[str]:
+        if not isinstance(payload, dict):
+            return None
+        raw = payload.get("request_id")
+        if raw is None:
+            return None
+        request_id = str(raw).strip()
+        return request_id if request_id else None
+
     def _handle_command(self, cmd: str, payload: object) -> None:
         logger.debug("Command received: %s %s", cmd, payload)
+        self._active_request_id = self._extract_request_id(payload)
         try:
             if self._try_handle_alarm_enabled_command(cmd, payload):
                 return
@@ -1245,6 +1503,8 @@ class Daemon:
             logger.exception("Error handling command %s", cmd)
             self._ack(cmd, False, str(exc))
             self._mqtt.publish_state("error", {"command": cmd, "error": str(exc)}, retain=False)
+        finally:
+            self._active_request_id = None
 
     def _try_handle_alarm_enabled_command(self, cmd: str, payload: object) -> bool:
         parts = cmd.split("/")
@@ -1433,9 +1693,12 @@ class Daemon:
         return False
 
     def _ack(self, cmd: str, success: bool, message: str = "") -> None:
+        payload = {"command": cmd, "success": success, "message": message}
+        if self._active_request_id is not None:
+            payload["request_id"] = self._active_request_id
         self._mqtt.publish_state(
             "command_result",
-            {"command": cmd, "success": success, "message": message},
+            payload,
             retain=False,
         )
 

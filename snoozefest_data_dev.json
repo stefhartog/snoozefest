@@ -2,7 +2,7 @@
   "alarms": [
     {
       "id": "1",
-      "time": "09:30",
+      "time": "10:30",
       "weekdays": [
         5,
         6
@@ -15,36 +15,7 @@
       "status": "active",
       "triggered_at": null,
       "snoozed_until": null
-    },
-    {
-      "id": "2",
-      "time": "06:00",
-      "weekdays": [
-        0,
-        1,
-        2,
-        3,
-        4
-      ],
-      "label": "Weekdays",
-      "enabled": true,
-      "temporary": false,
-      "recurring": true,
-      "last_triggered_date": null,
-      "status": "active",
-      "triggered_at": null,
-      "snoozed_until": null
     }
   ],
-  "timers": [
-    {
-      "id": "1",
-      "label": "Egg Timer",
-      "duration_seconds": 600,
-      "started_at": "2026-03-28T17:56:41.458020+00:00",
-      "expires_at": "2026-03-28T17:56:46.353473+00:00",
-      "status": "inactive",
-      "temporary": false
-    }
-  ]
+  "timers": []
 }

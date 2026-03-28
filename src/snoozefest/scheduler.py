@@ -9,6 +9,9 @@ from .models import Alarm, Timer
 from .store import AppState, Store
 
 
+_AUTO_DISMISS_RINGING_SECONDS = 5 * 60
+
+
 class Scheduler:
     """
     Tick-based alarm and timer engine.
@@ -134,6 +137,7 @@ class Scheduler:
             for alarm in state.alarms:
                 if alarm.status == "snoozed" and alarm.snoozed_until is not None and now_utc >= alarm.snoozed_until:
                     alarm.status = "ringing"
+                    alarm.triggered_at = now_utc
                     alarm.snoozed_until = None
                     state_changed = True
 
@@ -143,6 +147,51 @@ class Scheduler:
                     timer.status = "ringing"
                     state_changed = True
                     finished.append((timer.id, timer.label))
+
+            # Ringing alarms auto-dismiss after grace period if user takes no action.
+            for alarm in list(state.alarms):
+                if alarm.status != "ringing":
+                    continue
+
+                if alarm.triggered_at is None:
+                    alarm.triggered_at = now_utc
+                    state_changed = True
+                    continue
+
+                ringing_seconds = int((now_utc - alarm.triggered_at).total_seconds())
+                if ringing_seconds < _AUTO_DISMISS_RINGING_SECONDS:
+                    continue
+
+                if alarm.temporary:
+                    state.alarms.remove(alarm)
+                elif alarm.recurring:
+                    alarm.status = "active"
+                    alarm.enabled = True
+                    alarm.last_triggered_date = today_local
+                    alarm.triggered_at = None
+                    alarm.snoozed_until = None
+                else:
+                    alarm.status = "inactive"
+                    alarm.enabled = False
+                    alarm.triggered_at = None
+                    alarm.snoozed_until = None
+                state_changed = True
+
+            # Ringing timers auto-dismiss after grace period if user takes no action.
+            for timer in list(state.timers):
+                if timer.status != "ringing":
+                    continue
+
+                ringing_seconds = int((now_utc - timer.expires_at).total_seconds())
+                if ringing_seconds < _AUTO_DISMISS_RINGING_SECONDS:
+                    continue
+
+                if timer.temporary:
+                    state.timers.remove(timer)
+                else:
+                    timer.status = "inactive"
+                    timer.expires_at = now_utc
+                state_changed = True
 
             if state_changed:
                 self._store.save()

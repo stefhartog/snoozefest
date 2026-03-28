@@ -5,6 +5,7 @@ sequence:
   - variables:
       prefix: snoozefest_dev
       action_name: "{{ action | default('') }}"
+      request_id: "{{ request_id | default('va_' ~ now().strftime('%Y%m%d%H%M%S%f')) }}"
       alarm_time: "{{ time | default('') }}"
       alarm_time_normalized: >-
         {% set raw = (time | default('') | string).strip() %}
@@ -50,7 +51,6 @@ sequence:
         {% endif %}
       alarm_label: "{{ label | default('Voice Alarm') }}"
       timer_label: "{{ label | default('Voice Timer') }}"
-      is_temporary: "{{ temporary | default(false) }}"
       duration_text_raw: "{{ duration_text | default(minutes | default('')) }}"
       timer_secs: >-
         {% set ds = duration_seconds | default(0) | int %}
@@ -80,7 +80,7 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/alarm/new"
               payload: >-
-                {{ {'time': alarm_time_normalized, 'label': alarm_label, 'temporary': is_temporary} | tojson }}
+                {{ {'time': alarm_time_normalized, 'label': alarm_label, 'temporary': (temporary | default(false) | bool), 'request_id': request_id} | tojson }}
 
       - conditions: "{{ action_name == 'set_timer' }}"
         sequence:
@@ -88,7 +88,7 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/timer/new"
               payload: >-
-                {{ {'duration_seconds': timer_secs, 'duration_text': duration_text_raw, 'label': timer_label, 'temporary': is_temporary} | tojson }}
+                {{ {'duration_seconds': (timer_secs | int(0)), 'duration_text': duration_text_raw, 'label': timer_label, 'temporary': (temporary | default(false) | bool), 'request_id': request_id} | tojson }}
 
       - conditions: "{{ action_name == 'snooze_alarm' }}"
         sequence:
@@ -96,7 +96,7 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/alarm/snooze"
               payload: >-
-                {{ ({'id': alarm_id} if alarm_id is defined and alarm_id else {}) | tojson }}
+                {{ ({'id': alarm_id, 'request_id': request_id} if alarm_id is defined and alarm_id else {'request_id': request_id}) | tojson }}
 
       - conditions: "{{ action_name == 'dismiss_alarm' }}"
         sequence:
@@ -104,7 +104,7 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/alarm/dismiss"
               payload: >-
-                {{ ({'id': alarm_id} if alarm_id is defined and alarm_id else {}) | tojson }}
+                {{ ({'id': alarm_id, 'request_id': request_id} if alarm_id is defined and alarm_id else {'request_id': request_id}) | tojson }}
 
       - conditions: "{{ action_name == 'snooze_timer' }}"
         sequence:
@@ -112,7 +112,7 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/timer/snooze"
               payload: >-
-                {{ ({'id': timer_id} if timer_id is defined and timer_id else {}) | tojson }}
+                {{ ({'id': timer_id, 'request_id': request_id} if timer_id is defined and timer_id else {'request_id': request_id}) | tojson }}
 
       - conditions: "{{ action_name == 'dismiss_timer' }}"
         sequence:
@@ -120,7 +120,7 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/timer/dismiss"
               payload: >-
-                {{ ({'id': timer_id} if timer_id is defined and timer_id else {}) | tojson }}
+                {{ ({'id': timer_id, 'request_id': request_id} if timer_id is defined and timer_id else {'request_id': request_id}) | tojson }}
 
     default:
       - service: persistent_notification.create

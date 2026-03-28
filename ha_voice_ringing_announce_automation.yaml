@@ -2,27 +2,43 @@ alias: Snoozefest Ringing Announcer
 description: Proactive VA announcement when alarms/timers begin ringing
 mode: single
 max_exceeded: silent
+trigger_variables:
+  mqtt_prefix: snoozefest_dev
 
 trigger:
   - id: alarm_ringing
     platform: mqtt
-    topic: snoozefest_dev/state/ringing_alarm_count
+    topic: "{{ mqtt_prefix }}/state/ringing_alarm_count"
     value_template: "{{ (value | int(0)) > 0 }}"
 
   - id: timer_ringing
     platform: mqtt
-    topic: snoozefest_dev/state/ringing_timer_count
+    topic: "{{ mqtt_prefix }}/state/ringing_timer_count"
     value_template: "{{ (value | int(0)) > 0 }}"
 
 action:
+  - variables:
+      ringing_alarm_count: >-
+        {% if trigger.id == 'alarm_ringing' %}
+          {{ trigger.payload | int(0) }}
+        {% else %}
+          0
+        {% endif %}
+      ringing_timer_count: >-
+        {% if trigger.id == 'timer_ringing' %}
+          {{ trigger.payload | int(0) }}
+        {% else %}
+          0
+        {% endif %}
+
   - service: mqtt.publish
     data:
-      topic: snoozefest_dev/cmd/state/request
+      topic: "{{ mqtt_prefix }}/cmd/state/request"
       payload: "{}"
 
   - wait_for_trigger:
       - platform: mqtt
-        topic: snoozefest_dev/state/ringing_alarm_count
+        topic: "{{ mqtt_prefix }}/state/ringing_alarm_count"
     timeout: "00:00:01"
     continue_on_timeout: true
 
@@ -31,12 +47,12 @@ action:
         {% if wait.trigger is not none %}
           {{ wait.trigger.payload | int(0) }}
         {% else %}
-          0
+          {{ ringing_alarm_count | int(0) }}
         {% endif %}
 
   - wait_for_trigger:
       - platform: mqtt
-        topic: snoozefest_dev/state/ringing_timer_count
+        topic: "{{ mqtt_prefix }}/state/ringing_timer_count"
     timeout: "00:00:01"
     continue_on_timeout: true
 
@@ -45,7 +61,7 @@ action:
         {% if wait.trigger is not none %}
           {{ wait.trigger.payload | int(0) }}
         {% else %}
-          0
+          {{ ringing_timer_count | int(0) }}
         {% endif %}
 
   - choose:
@@ -77,20 +93,20 @@ action:
               sequence:
                 - wait_for_trigger:
                     - platform: mqtt
-                      topic: snoozefest_dev/state/ringing_alarm_count
+                      topic: "{{ mqtt_prefix }}/state/ringing_alarm_count"
                     - platform: mqtt
-                      topic: snoozefest_dev/state/ringing_timer_count
+                      topic: "{{ mqtt_prefix }}/state/ringing_timer_count"
                   timeout: "00:00:30"
                   continue_on_timeout: true
 
                 - service: mqtt.publish
                   data:
-                    topic: snoozefest_dev/cmd/state/request
+                    topic: "{{ mqtt_prefix }}/cmd/state/request"
                     payload: "{}"
 
                 - wait_for_trigger:
                     - platform: mqtt
-                      topic: snoozefest_dev/state/ringing_alarm_count
+                      topic: "{{ mqtt_prefix }}/state/ringing_alarm_count"
                   timeout: "00:00:01"
                   continue_on_timeout: true
 
@@ -99,12 +115,12 @@ action:
                       {% if wait.trigger is not none %}
                         {{ wait.trigger.payload | int(0) }}
                       {% else %}
-                        0
+                        {{ ringing_alarm_count | int(0) }}
                       {% endif %}
 
                 - wait_for_trigger:
                     - platform: mqtt
-                      topic: snoozefest_dev/state/ringing_timer_count
+                      topic: "{{ mqtt_prefix }}/state/ringing_timer_count"
                   timeout: "00:00:01"
                   continue_on_timeout: true
 
@@ -113,5 +129,5 @@ action:
                       {% if wait.trigger is not none %}
                         {{ wait.trigger.payload | int(0) }}
                       {% else %}
-                        0
+                        {{ ringing_timer_count | int(0) }}
                       {% endif %}
