@@ -1,28 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 
 
 @dataclass
-class AlarmOneOff:
-    time: datetime          # timezone-aware UTC
+class Alarm:
+    time: str                               # "HH:MM" in local timezone
     label: str
     id: str
     enabled: bool = True
     temporary: bool = False
-
-
-@dataclass
-class AlarmRecurring:
-    time: str               # "HH:MM" in local timezone
-    weekdays: List[int]     # 0 = Monday … 6 = Sunday
-    label: str
-    id: str
-    enabled: bool = True
-    temporary: bool = False
-    last_triggered_date: Optional[str] = None   # "YYYY-MM-DD"; set on dismiss
+    recurring: bool = False
+    weekdays: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4, 5, 6])
+    last_triggered_date: Optional[str] = None   # "YYYY-MM-DD"; set on dismiss when recurring
+    status: str = "active"
+    triggered_at: Optional[datetime] = None     # UTC
+    snoozed_until: Optional[datetime] = None    # UTC
 
 
 @dataclass
@@ -32,19 +27,5 @@ class Timer:
     started_at: datetime    # UTC
     expires_at: datetime    # UTC
     id: str
-    status: str = "running"
+    status: str = "active"
     temporary: bool = False
-
-
-@dataclass
-class ActiveAlarm:
-    alarm_id: str
-    triggered_at: datetime              # UTC
-    snoozed_until: Optional[datetime] = None    # UTC; None → currently ringing
-
-    @property
-    def is_ringing(self) -> bool:
-        from datetime import timezone
-        if self.snoozed_until is None:
-            return True
-        return datetime.now(timezone.utc) >= self.snoozed_until

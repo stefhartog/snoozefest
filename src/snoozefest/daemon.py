@@ -96,7 +96,8 @@ class Daemon:
         ringing_timer_count = self._ringing_timer_count(state)
         self._mqtt.publish_state("alarms", state["alarms"])
         self._mqtt.publish_state("timers", state["timers"])
-        self._mqtt.publish_state("active_alarm", state["active_alarm"])
+        # Clear deprecated aggregate active_alarm topic retained state.
+        self._mqtt.publish_state("active_alarm", "")
         self._mqtt.publish_state("ringing_alarm_count", ringing_alarm_count)
         self._mqtt.publish_state("ringing_timer_count", ringing_timer_count)
         self._mqtt.publish_state("next_alarm", state["next_alarm"])
@@ -150,8 +151,7 @@ class Daemon:
 
     @staticmethod
     def _ringing_alarm_count(state: dict) -> int:
-        active_alarm = state.get("active_alarm", {})
-        return len(active_alarm.get("ringing", []))
+        return sum(1 for alarm in state.get("alarms", []) if str(alarm.get("status")) == "ringing")
 
     @staticmethod
     def _ringing_timer_count(state: dict) -> int:
@@ -253,11 +253,19 @@ class Daemon:
     def _alarm_status_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_status"
 
+    def _alarm_remaining_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_remaining"
+
     def _alarm_eta_object_id(self, alarm_id: str) -> str:
-        return f"{self._alarm_object_id(alarm_id)}_eta"
+        # Backward-compatible alias retained for transitional references.
+        return self._alarm_remaining_object_id(alarm_id)
+
+    def _alarm_recurring_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_recurring"
 
     def _alarm_kind_object_id(self, alarm_id: str) -> str:
-        return f"{self._alarm_object_id(alarm_id)}_kind"
+        # Backward-compatible alias retained for transitional cleanup.
+        return self._alarm_recurring_object_id(alarm_id)
 
     def _alarm_label_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_label"
@@ -301,17 +309,35 @@ class Daemon:
             f"{self._alarm_status_object_id(alarm_id)}/config"
         )
 
-    def _alarm_eta_discovery_topic(self, alarm_id: str) -> str:
+    def _alarm_remaining_discovery_topic(self, alarm_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
-            f"{self._alarm_eta_object_id(alarm_id)}/config"
+            f"{self._alarm_remaining_object_id(alarm_id)}/config"
+        )
+
+    def _alarm_eta_discovery_topic_legacy(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_object_id(alarm_id)}_eta/config"
+        )
+
+    def _alarm_eta_discovery_topic(self, alarm_id: str) -> str:
+        return self._alarm_remaining_discovery_topic(alarm_id)
+
+    def _alarm_recurring_discovery_topic(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/switch/"
+            f"{self._alarm_recurring_object_id(alarm_id)}/config"
+        )
+
+    def _alarm_kind_discovery_topic_legacy(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_object_id(alarm_id)}_kind/config"
         )
 
     def _alarm_kind_discovery_topic(self, alarm_id: str) -> str:
-        return (
-            f"{self._config.homeassistant_discovery_prefix}/sensor/"
-            f"{self._alarm_kind_object_id(alarm_id)}/config"
-        )
+        return self._alarm_recurring_discovery_topic(alarm_id)
 
     def _alarm_label_discovery_topic(self, alarm_id: str) -> str:
         return (
@@ -355,11 +381,26 @@ class Daemon:
     def _alarm_status_state_topic(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/status"
 
-    def _alarm_eta_state_topic(self, alarm_id: str) -> str:
+    def _alarm_remaining_state_topic(self, alarm_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/remaining"
+
+    def _alarm_eta_state_topic_legacy(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/eta"
 
-    def _alarm_kind_state_topic(self, alarm_id: str) -> str:
+    def _alarm_eta_state_topic(self, alarm_id: str) -> str:
+        return self._alarm_remaining_state_topic(alarm_id)
+
+    def _alarm_recurring_state_topic(self, alarm_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/recurring"
+
+    def _alarm_recurring_command_topic(self, alarm_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/cmd/alarm/{alarm_id}/recurring/set"
+
+    def _alarm_kind_state_topic_legacy(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/kind"
+
+    def _alarm_kind_state_topic(self, alarm_id: str) -> str:
+        return self._alarm_recurring_state_topic(alarm_id)
 
     def _alarm_label_state_topic(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/label"
@@ -399,23 +440,9 @@ class Daemon:
 
     @staticmethod
     def _alarm_time_value(alarm: dict) -> str:
-        if str(alarm.get("kind", "")) == "recurring":
-            recurring = str(alarm.get("time") or "")
-            if recurring and len(recurring) == 5:
-                return f"{recurring}:00"
-            return recurring
-
-        friendly = str(alarm.get("time_friendly") or "")
-        if len(friendly) >= 19:
-            return friendly[11:19]
-
-        local_time = str(alarm.get("time_local") or "")
-        if len(local_time) >= 19:
-            return local_time[11:19]
-
         raw = str(alarm.get("time") or "")
-        if "T" in raw and len(raw) >= 19:
-            return raw[11:19]
+        if raw and len(raw) == 5:
+            return f"{raw}:00"
         return raw
 
     def _alarm_time_entity_value(self, alarm: dict) -> str:
@@ -430,32 +457,26 @@ class Daemon:
         return base
 
     @staticmethod
-    def _seconds_to_hhmmss(total_seconds: int) -> str:
+    def _seconds_to_ddhhmmss(total_seconds: int) -> str:
         total_seconds = max(0, int(total_seconds))
-        hours, remainder = divmod(total_seconds, 3600)
+        days, remainder = divmod(total_seconds, 24 * 3600)
+        hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return f"{days:02d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     def _timer_remaining_entity_value(self, timer: dict) -> str:
-        remaining = int(timer.get("remaining_seconds", 0))
-        return self._seconds_to_hhmmss(remaining)
+        remaining = int(timer.get("remaining", timer.get("remaining_seconds", 0)))
+        return self._seconds_to_ddhhmmss(remaining)
 
     @staticmethod
-    def _alarm_status_map(active_alarm: dict) -> dict[str, str]:
-        status_by_id: dict[str, str] = {}
-        for entry in active_alarm.get("ringing", []):
-            status_by_id[str(entry.get("alarm_id"))] = "ringing"
-        for entry in active_alarm.get("snoozed", []):
-            status_by_id[str(entry.get("alarm_id"))] = "snoozed"
-        return status_by_id
-
-    @staticmethod
-    def _normalized_alarm_status_fallback(alarm: dict, runtime_status: str) -> str:
-        status = str(runtime_status).strip().lower()
+    def _normalized_alarm_status_fallback(alarm: dict, status: str) -> str:
+        status = str(status).strip().lower()
         if status == "ringing":
             return "Ringing"
         if status == "snoozed":
             return "Snoozed"
+        if status == "active":
+            return "Active"
         if not bool(alarm.get("enabled", True)):
             return "Inactive"
         return "Active"
@@ -467,7 +488,7 @@ class Daemon:
             return "Ringing"
         if status == "snoozed":
             return "Snoozed"
-        if status == "running":
+        if status == "active":
             return "Active"
         return "Inactive"
 
@@ -485,6 +506,9 @@ class Daemon:
 
     def _timer_snooze_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_snooze"
+
+    def _timer_activate_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_activate"
 
     def _timer_dismiss_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_dismiss"
@@ -537,6 +561,12 @@ class Daemon:
             f"{self._timer_snooze_object_id(timer_id)}/config"
         )
 
+    def _timer_activate_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._timer_activate_object_id(timer_id)}/config"
+        )
+
     def _timer_dismiss_discovery_topic(self, timer_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
@@ -559,6 +589,9 @@ class Daemon:
         return f"{self._config.mqtt_topic_prefix}/cmd/timer/{timer_id}/duration/set"
 
     def _timer_remaining_state_topic(self, timer_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/remaining"
+
+    def _timer_remaining_state_topic_legacy(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/remaining_seconds"
 
     def _timer_attributes_topic(self, timer_id: str) -> str:
@@ -573,7 +606,7 @@ class Daemon:
         return max(1, int(timer.get("duration_seconds", 1)))
 
     def _timer_duration_entity_value(self, timer: dict) -> str:
-        return self._seconds_to_hhmmss(self._timer_duration_seconds(timer))
+        return self._seconds_to_ddhhmmss(self._timer_duration_seconds(timer))
 
     def _publish_timer_entities(self, state: dict) -> None:
         if not self._config.homeassistant_discovery_prefix:
@@ -607,7 +640,7 @@ class Daemon:
                 "state_topic": self._timer_duration_state_topic(timer_id),
                 "command_topic": self._timer_duration_command_topic(timer_id),
                 "icon": "mdi:timer-edit-outline",
-                "pattern": "^(\\d{1,2}:)?[0-5]?\\d:[0-5]\\d$",
+                "pattern": "^(\\d{1,3}:([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d|([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d|[0-5]?\\d:[0-5]\\d)$",
                 "mode": "text",
                 "device": self._timer_device(timer, timer_id),
             }
@@ -658,8 +691,20 @@ class Daemon:
                 "icon": "mdi:alarm-snooze",
                 "device": self._timer_device(timer, timer_id),
             }
+            activate_payload = {
+                "name": "11 Activate",
+                "unique_id": self._timer_activate_object_id(timer_id),
+                "object_id": self._timer_activate_object_id(timer_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/activate",
+                "payload_press": f'{{"id":"{timer_id}"}}',
+                "icon": "mdi:play",
+                "device": self._timer_device(timer, timer_id),
+            }
             dismiss_payload = {
-                "name": "12 Dismiss/Restart",
+                "name": "12 Dismiss",
                 "unique_id": self._timer_dismiss_object_id(timer_id),
                 "object_id": self._timer_dismiss_object_id(timer_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
@@ -667,7 +712,7 @@ class Daemon:
                 "payload_not_available": "false",
                 "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/dismiss",
                 "payload_press": f'{{"id":"{timer_id}"}}',
-                "icon": "mdi:restart",
+                "icon": "mdi:stop",
                 "device": self._timer_device(timer, timer_id),
             }
 
@@ -678,15 +723,17 @@ class Daemon:
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), remaining_payload, retain=True)
             self._mqtt.publish(self._timer_remove_discovery_topic(timer_id), remove_payload, retain=True)
             self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), snooze_payload, retain=True)
+            self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), activate_payload, retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), dismiss_payload, retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
             self._mqtt.publish(
                 self._timer_status_state_topic(timer_id),
-                str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "running")))),
+                str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "inactive")))),
                 retain=True,
             )
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
+            self._mqtt.publish(self._timer_remaining_state_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
         removed_ids = previous_ids - current_ids
@@ -698,11 +745,13 @@ class Daemon:
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remove_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_remaining_state_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), "", retain=True)
 
         self._published_timer_entities = current_ids
@@ -712,7 +761,6 @@ class Daemon:
             return
 
         alarms: list[dict] = state.get("alarms", [])
-        status_by_id = self._alarm_status_map(state.get("active_alarm", {}))
 
         current_ids = {str(alarm["id"]) for alarm in alarms}
 
@@ -782,27 +830,31 @@ class Daemon:
                 "icon": "mdi:alarm-light",
                 "device": self._alarm_device(alarm, alarm_id),
             }
-            eta_payload = {
+            remaining_payload = {
                 "name": "07 Remaining",
-                "unique_id": self._alarm_eta_object_id(alarm_id),
-                "object_id": self._alarm_eta_object_id(alarm_id),
+                "unique_id": self._alarm_remaining_object_id(alarm_id),
+                "object_id": self._alarm_remaining_object_id(alarm_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
                 "payload_available": "true",
                 "payload_not_available": "false",
-                "state_topic": self._alarm_eta_state_topic(alarm_id),
+                "state_topic": self._alarm_remaining_state_topic(alarm_id),
                 "icon": "mdi:timer-sand",
                 "device": self._alarm_device(alarm, alarm_id),
             }
-            kind_payload = {
-                "name": "05 Kind",
-                "unique_id": self._alarm_kind_object_id(alarm_id),
-                "object_id": self._alarm_kind_object_id(alarm_id),
+            recurring_payload = {
+                "name": "05 Recurring",
+                "unique_id": self._alarm_recurring_object_id(alarm_id),
+                "object_id": self._alarm_recurring_object_id(alarm_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
                 "payload_available": "true",
                 "payload_not_available": "false",
-                "state_topic": self._alarm_kind_state_topic(alarm_id),
-                "icon": "mdi:shape-outline",
-                "entity_category": "diagnostic",
+                "state_topic": self._alarm_recurring_state_topic(alarm_id),
+                "command_topic": self._alarm_recurring_command_topic(alarm_id),
+                "payload_on": "ON",
+                "payload_off": "OFF",
+                "state_on": "ON",
+                "state_off": "OFF",
+                "icon": "mdi:calendar-sync",
                 "device": self._alarm_device(alarm, alarm_id),
             }
             label_payload = {
@@ -854,8 +906,10 @@ class Daemon:
             self._mqtt.publish(self._alarm_snooze_discovery_topic(alarm_id), snooze_payload, retain=True)
             self._mqtt.publish(self._alarm_dismiss_discovery_topic(alarm_id), dismiss_payload, retain=True)
             self._mqtt.publish(self._alarm_status_discovery_topic(alarm_id), status_payload, retain=True)
-            self._mqtt.publish(self._alarm_eta_discovery_topic(alarm_id), eta_payload, retain=True)
-            self._mqtt.publish(self._alarm_kind_discovery_topic(alarm_id), kind_payload, retain=True)
+            self._mqtt.publish(self._alarm_eta_discovery_topic_legacy(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_remaining_discovery_topic(alarm_id), remaining_payload, retain=True)
+            self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), recurring_payload, retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), label_payload, retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic(alarm_id), time_payload, retain=True)
@@ -865,20 +919,23 @@ class Daemon:
             self._mqtt.publish(self._alarm_enabled_state_topic(alarm_id), "ON" if alarm.get("enabled", True) else "OFF", retain=True)
             self._mqtt.publish(
                 self._alarm_status_state_topic(alarm_id),
-                str(alarm.get("status_normalized") or self._normalized_alarm_status_fallback(alarm, status_by_id.get(alarm_id, "idle"))),
+                str(alarm.get("status_normalized") or self._normalized_alarm_status_fallback(alarm, str(alarm.get("status", "inactive")))),
                 retain=True,
             )
-            self._mqtt.publish(self._alarm_kind_state_topic(alarm_id), str(alarm.get("kind", "oneoff")), retain=True)
+            recurring_value = "ON" if bool(alarm.get("recurring", False)) else "OFF"
+            self._mqtt.publish(self._alarm_recurring_state_topic(alarm_id), recurring_value, retain=True)
+            self._mqtt.publish(self._alarm_kind_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_state_topic(alarm_id), str(alarm.get("label", "Alarm")), retain=True)
             self._mqtt.publish(self._alarm_time_state_topic(alarm_id), self._alarm_time_entity_value(alarm), retain=True)
             weekdays_set = {int(d) for d in alarm.get("weekdays", [])}
             for wd in range(7):
                 self._mqtt.publish(self._alarm_weekday_state_topic(alarm_id, wd), "ON" if wd in weekdays_set else "OFF", retain=True)
             self._mqtt.publish(
-                self._alarm_eta_state_topic(alarm_id),
-                self._alarm_eta_state(alarm, status_by_id=status_by_id),
+                self._alarm_remaining_state_topic(alarm_id),
+                self._alarm_eta_state(alarm),
                 retain=True,
             )
+            self._mqtt.publish(self._alarm_eta_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_attributes_topic(alarm_id), alarm, retain=True)
 
         removed_ids = self._published_alarm_entities - current_ids
@@ -888,8 +945,10 @@ class Daemon:
             self._mqtt.publish(self._alarm_snooze_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_dismiss_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_status_discovery_topic(alarm_id), "", retain=True)
-            self._mqtt.publish(self._alarm_eta_discovery_topic(alarm_id), "", retain=True)
-            self._mqtt.publish(self._alarm_kind_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_eta_discovery_topic_legacy(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_remaining_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_legacy(alarm_id), "", retain=True)
@@ -898,22 +957,23 @@ class Daemon:
                 self._mqtt.publish(self._alarm_weekday_discovery_topic(alarm_id, wd), "", retain=True)
             self._mqtt.publish(self._alarm_enabled_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_status_state_topic(alarm_id), "", retain=True)
-            self._mqtt.publish(self._alarm_kind_state_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_recurring_state_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_kind_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_weekdays_state_topic(alarm_id), "", retain=True)
             for wd in range(7):
                 self._mqtt.publish(self._alarm_weekday_state_topic(alarm_id, wd), "", retain=True)
-            self._mqtt.publish(self._alarm_eta_state_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_remaining_state_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_eta_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_attributes_topic(alarm_id), "", retain=True)
 
         self._published_alarm_entities = current_ids
 
-    def _alarm_eta_state(self, alarm: dict, status_by_id: dict[str, str]) -> str:
-        alarm_id = str(alarm.get("id", ""))
-        status = status_by_id.get(alarm_id, "idle")
+    def _alarm_eta_state(self, alarm: dict) -> str:
+        status = str(alarm.get("status", "inactive")).strip().lower()
         if status in {"ringing", "snoozed"}:
-            return "00:00:00"
+            return "00:00:00:00"
         if not alarm.get("enabled", True):
             return ""
 
@@ -924,52 +984,52 @@ class Daemon:
         now_utc = datetime.now(timezone.utc)
         remaining_seconds = int((next_trigger - now_utc).total_seconds())
         if remaining_seconds <= 0:
-            return "00:00:00"
+            return "00:00:00:00"
 
-        total_minutes = remaining_seconds // 60
-        days, rem_minutes = divmod(total_minutes, 24 * 60)
-        hours, minutes = divmod(rem_minutes, 60)
-        return f"{days:02d}:{hours:02d}:{minutes:02d}"
+        days, rem_seconds = divmod(remaining_seconds, 24 * 3600)
+        hours, rem_seconds = divmod(rem_seconds, 3600)
+        minutes, seconds = divmod(rem_seconds, 60)
+        return f"{days:02d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     def _next_alarm_trigger_utc(self, alarm: dict) -> Optional[datetime]:
         now_utc = datetime.now(timezone.utc)
-        kind = str(alarm.get("kind", ""))
-        if kind == "oneoff":
-            raw_time = alarm.get("time_utc") or alarm.get("time")
-            if not raw_time:
-                return None
-            trigger = datetime.fromisoformat(str(raw_time))
-            if trigger.tzinfo is None:
-                trigger = trigger.replace(tzinfo=self._tz)
-            trigger_utc = trigger.astimezone(timezone.utc)
-            return trigger_utc if trigger_utc > now_utc else None
+        time_str = str(alarm.get("time", ""))
+        if ":" not in time_str:
+            return None
+        hour, minute = map(int, time_str.split(":", 1))
 
-        if kind == "recurring":
-            time_str = str(alarm.get("time", ""))
-            if ":" not in time_str:
-                return None
-            hour, minute = map(int, time_str.split(":", 1))
-            raw_weekdays = alarm.get("weekdays") or []
-            weekdays = {int(day) for day in raw_weekdays if 0 <= int(day) <= 6}
-            if not weekdays:
-                return None
-            now_local = now_utc.astimezone(self._tz)
-            for day_offset in range(8):
-                target_date = now_local.date() + timedelta(days=day_offset)
-                if target_date.weekday() not in weekdays:
-                    continue
-                target_local = datetime(
-                    target_date.year,
-                    target_date.month,
-                    target_date.day,
-                    hour,
-                    minute,
-                    0,
-                    tzinfo=self._tz,
-                )
-                target_utc = target_local.astimezone(timezone.utc)
-                if target_utc > now_utc:
-                    return target_utc
+        now_local = now_utc.astimezone(self._tz)
+        recurring = bool(alarm.get("recurring", False))
+
+        if not recurring and alarm.get("last_triggered_date") is not None:
+            return None
+
+        raw_weekdays = alarm.get("weekdays") or []
+        weekdays = {int(day) for day in raw_weekdays if 0 <= int(day) <= 6}
+        if recurring and not weekdays:
+            return None
+        if not recurring and not weekdays:
+            weekdays = set(range(7))
+
+        for day_offset in range(8):
+            target_date = now_local.date() + timedelta(days=day_offset)
+            if target_date.weekday() not in weekdays:
+                continue
+            if recurring and day_offset == 0 and alarm.get("last_triggered_date") == target_date.isoformat():
+                continue
+
+            target_local = datetime(
+                target_date.year,
+                target_date.month,
+                target_date.day,
+                hour,
+                minute,
+                0,
+                tzinfo=self._tz,
+            )
+            target_utc = target_local.astimezone(timezone.utc)
+            if target_utc > now_utc:
+                return target_utc
         return None
 
     @staticmethod
@@ -1092,6 +1152,9 @@ class Daemon:
             return default_seconds
 
         unit_seconds = {
+            "d": 86400,
+            "day": 86400,
+            "days": 86400,
             "h": 3600,
             "hr": 3600,
             "hrs": 3600,
@@ -1111,7 +1174,7 @@ class Daemon:
 
         total_seconds = 0.0
         pattern = re.compile(
-            r"(?P<value>[a-z0-9\.\-\s]+?)\s*(?P<unit>hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b"
+            r"(?P<value>[a-z0-9\.\-\s]+?)\s*(?P<unit>days?|d|hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b"
         )
 
         for match in pattern.finditer(text):
@@ -1162,6 +1225,7 @@ class Daemon:
                 "timer/cancel":   self._cmd_timer_cancel,
                 "timer/remove":   self._cmd_timer_remove,
                 "timer/snooze":   self._cmd_timer_snooze,
+                "timer/activate": self._cmd_timer_activate,
                 "timer/dismiss":  self._cmd_timer_dismiss,
                 "state/request":  self._cmd_state_request,
             }.get(cmd)
@@ -1201,8 +1265,8 @@ class Daemon:
         else:
             raise TypeError("Alarm enabled payload must be ON/OFF or boolean")
 
-        kind = self._scheduler.update_alarm(alarm_id, enabled=enabled)
-        if kind:
+        updated = self._scheduler.update_alarm(alarm_id, enabled=enabled)
+        if updated:
             self._ack(cmd, True, f"Alarm {'enabled' if enabled else 'disabled'}: {alarm_id}")
         else:
             self._ack(cmd, False, f"Alarm not found: {alarm_id}")
@@ -1219,8 +1283,8 @@ class Daemon:
         if field == "time":
             if not isinstance(payload, str):
                 raise TypeError("Alarm time payload must be HH:MM string")
-            kind = self._scheduler.set_alarm(alarm_id, time=payload)
-            if kind:
+            updated = self._scheduler.set_alarm(alarm_id, time=payload)
+            if updated:
                 self._ack(cmd, True, f"Alarm time updated: {alarm_id}")
             else:
                 self._ack(cmd, False, f"Alarm not found: {alarm_id}")
@@ -1229,8 +1293,8 @@ class Daemon:
         if field == "label":
             if not isinstance(payload, str):
                 raise TypeError("Alarm label payload must be a string")
-            kind = self._scheduler.set_alarm(alarm_id, label=payload)
-            if kind:
+            updated = self._scheduler.set_alarm(alarm_id, label=payload)
+            if updated:
                 self._ack(cmd, True, f"Alarm label updated: {alarm_id}")
             else:
                 self._ack(cmd, False, f"Alarm not found: {alarm_id}")
@@ -1244,9 +1308,30 @@ class Daemon:
                 weekdays: list[int] = []
             else:
                 weekdays = [int(part.strip()) for part in raw.split(",") if part.strip() != ""]
-            kind = self._scheduler.set_alarm(alarm_id, weekdays=weekdays)
-            if kind:
+            updated = self._scheduler.set_alarm(alarm_id, weekdays=weekdays)
+            if updated:
                 self._ack(cmd, True, f"Alarm weekdays updated: {alarm_id}")
+            else:
+                self._ack(cmd, False, f"Alarm not found: {alarm_id}")
+            return True
+
+        if field == "recurring":
+            if isinstance(payload, bool):
+                recurring = payload
+            elif isinstance(payload, str):
+                normalized = payload.strip().upper()
+                if normalized in {"ON", "TRUE", "1"}:
+                    recurring = True
+                elif normalized in {"OFF", "FALSE", "0"}:
+                    recurring = False
+                else:
+                    raise ValueError(f"Unsupported recurring payload: {payload!r}")
+            else:
+                raise TypeError("Alarm recurring payload must be ON/OFF or boolean")
+
+            updated = self._scheduler.set_alarm(alarm_id, recurring=recurring)
+            if updated:
+                self._ack(cmd, True, f"Alarm recurring updated: {alarm_id}")
             else:
                 self._ack(cmd, False, f"Alarm not found: {alarm_id}")
             return True
@@ -1255,7 +1340,7 @@ class Daemon:
 
     def _try_handle_alarm_weekday_toggle_command(self, cmd: str, payload: object) -> bool:
         parts = cmd.split("/")
-        if len(parts) != 6 or parts[0] != "alarm" or parts[2] != "weekday" or parts[5] != "set":
+        if len(parts) != 5 or parts[0] != "alarm" or parts[2] != "weekday" or parts[4] != "set":
             return False
 
         alarm_id = parts[1]
@@ -1290,8 +1375,8 @@ class Daemon:
         else:
             current_days = [d for d in current_days if d != weekday]
 
-        kind = self._scheduler.set_alarm(alarm_id, weekdays=current_days)
-        if kind:
+        updated = self._scheduler.set_alarm(alarm_id, weekdays=current_days)
+        if updated:
             self._ack(cmd, True, f"Alarm weekday updated: {alarm_id}")
         else:
             self._ack(cmd, False, f"Alarm not found: {alarm_id}")
@@ -1324,18 +1409,20 @@ class Daemon:
                 if ":" in text:
                     parts = [int(p) for p in text.split(":")]
                     if len(parts) == 2:
-                        hh, mm, ss = 0, parts[0], parts[1]
+                        dd, hh, mm, ss = 0, 0, parts[0], parts[1]
                     elif len(parts) == 3:
-                        hh, mm, ss = parts
+                        dd, hh, mm, ss = 0, parts[0], parts[1], parts[2]
+                    elif len(parts) == 4:
+                        dd, hh, mm, ss = parts
                     else:
-                        raise ValueError("Timer duration must be HH:MM:SS or MM:SS")
-                    duration_seconds = hh * 3600 + mm * 60 + ss
+                        raise ValueError("Timer duration must be DD:HH:MM:SS, HH:MM:SS, or MM:SS")
+                    duration_seconds = dd * 86400 + hh * 3600 + mm * 60 + ss
                     if duration_seconds < 1:
                         raise ValueError("duration_seconds must be ≥ 1")
                 else:
                     duration_seconds = self._parse_duration_seconds({"duration_text": text}, default_seconds=300)
             else:
-                raise TypeError("Timer duration payload must be numeric, HH:MM:SS, or duration text")
+                raise TypeError("Timer duration payload must be numeric, DD:HH:MM:SS/HH:MM:SS/MM:SS, or duration text")
 
             if self._scheduler.update_timer(timer_id, duration_seconds=duration_seconds):
                 self._ack(cmd, True, f"Timer duration updated: {timer_id}")
@@ -1364,29 +1451,39 @@ class Daemon:
         )
 
     def _cmd_alarm_new(self, payload: dict) -> None:
-        """Create a new one-off alarm. Payload can include:
+        """Create a new alarm. Payload can include:
         - time: "HH:MM" string (default: now+1min)
         - label: string (default: "New Alarm")
         - enabled: bool (default: true when payload is non-empty, else false)
         - temporary: bool (default: false)
+        - recurring: bool (default: false)
+        - weekdays: [0..6] list (default: all days)
         """
         now_local = datetime.now(self._tz)
         default_time = (now_local + timedelta(minutes=1)).replace(second=0, microsecond=0).strftime("%H:%M")
-        
+
         time_str = payload.get("time", default_time)
         label = payload.get("label", "New Alarm")
         enabled = bool(payload.get("enabled", bool(payload)))
         temporary = bool(payload.get("temporary", False))
+        recurring = bool(payload.get("recurring", False))
+        weekdays_raw = payload.get("weekdays")
+        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else [0, 1, 2, 3, 4, 5, 6]
+        if not all(0 <= d <= 6 for d in weekdays):
+            raise ValueError("weekdays must be integers 0-6")
 
-        alarm = self._scheduler.add_oneoff_time(
+        alarm = self._scheduler.add_alarm(
             str(time_str),
             str(label),
             enabled=enabled,
             temporary=temporary,
+            recurring=recurring,
+            weekdays=weekdays,
         )
         status = "enabled" if enabled else "disabled"
         temp_suffix = " temporary" if temporary else ""
-        self._ack("alarm/new", True, f"One-off{temp_suffix} alarm created {status}: {alarm.id}")
+        kind = "Recurring" if recurring else "Alarm"
+        self._ack("alarm/new", True, f"{kind}{temp_suffix} created {status}: {alarm.id}")
 
     def _cmd_alarm_set(self, payload: dict) -> None:
         label = str(payload.get("label", "Alarm"))
@@ -1400,27 +1497,35 @@ class Daemon:
 
         weekdays_raw = payload.get("weekdays")
         temporary = bool(payload.get("temporary", False))
-        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else []
+        recurring = bool(payload.get("recurring", weekdays_raw is not None))
+        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else [0, 1, 2, 3, 4, 5, 6]
         if not all(0 <= d <= 6 for d in weekdays):
             raise ValueError("weekdays must be integers 0-6")
 
-        if weekdays:
-            alarm = self._scheduler.add_recurring(time_str, weekdays, label, enabled=False, temporary=temporary)
+        alarm = self._scheduler.add_alarm(
+            time_str,
+            label,
+            enabled=False,
+            temporary=temporary,
+            recurring=recurring,
+            weekdays=weekdays,
+        )
+        if recurring:
             self._ack("alarm/set", True, f"Recurring alarm created disabled: {alarm.id}")
         else:
-            alarm = self._scheduler.add_oneoff_time(time_str, label, enabled=False, temporary=temporary)
             self._ack("alarm/set", True, f"One-off alarm created disabled: {alarm.id}")
 
     def _cmd_alarm_update(self, payload: dict) -> None:
         alarm_id = str(payload["id"])
-        kind = self._scheduler.set_alarm(
+        updated = self._scheduler.set_alarm(
             alarm_id,
             time=payload.get("time"),
             weekdays=payload.get("weekdays"),
             label=payload.get("label"),
             enabled=payload.get("enabled"),
+            recurring=payload.get("recurring"),
         )
-        if kind:
+        if updated:
             self._ack("alarm/update", True, f"Alarm updated: {alarm_id}")
         else:
             self._ack("alarm/update", False, f"Alarm not found: {alarm_id}")
@@ -1459,15 +1564,15 @@ class Daemon:
         """Create a new timer. Payload can include:
         - duration_seconds: int (default: 300)
         - label: string (default: "New Timer")
-        - running: bool (default: true when payload is non-empty, else false)
+        - active: bool (default: true when payload is non-empty, else false)
         - temporary: bool (default: false)
         """
         duration = self._parse_duration_seconds(payload, default_seconds=300)
         
         label = payload.get("label", "New Timer")
-        running = bool(payload.get("running", bool(payload)))
+        is_active = bool(payload.get("active", payload.get("running", bool(payload))))
         temporary = bool(payload.get("temporary", False))
-        initial_status = "running" if running else "dismissed"
+        initial_status = "active" if is_active else "inactive"
         timer = self._scheduler.add_timer(
             duration,
             str(label),
@@ -1480,8 +1585,8 @@ class Daemon:
         duration = self._parse_duration_seconds(payload, default_seconds=300)
         label = str(payload.get("label", "Timer"))
         temporary = bool(payload.get("temporary", False))
-        timer = self._scheduler.add_timer(duration, label, initial_status="dismissed", temporary=temporary)
-        self._ack("timer/set", True, f"Timer created dismissed: {timer.id}")
+        timer = self._scheduler.add_timer(duration, label, initial_status="inactive", temporary=temporary)
+        self._ack("timer/set", True, f"Timer created inactive: {timer.id}")
 
     def _publish_timer_runtime_state(self, state: dict) -> None:
         timers: list[dict] = state.get("timers", [])
@@ -1491,7 +1596,7 @@ class Daemon:
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
             self._mqtt.publish(
                 self._timer_status_state_topic(timer_id),
-                str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "running")))),
+                str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "inactive")))),
                 retain=True,
             )
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
@@ -1539,6 +1644,20 @@ class Daemon:
             else:
                 self._ack("timer/snooze", False, f"Timer is not ringing: {timer_id}")
 
+    def _cmd_timer_activate(self, payload: dict) -> None:
+        timer_id_raw = payload.get("id")
+        timer_id = str(timer_id_raw) if timer_id_raw is not None else None
+        if self._scheduler.activate_timer(timer_id):
+            if timer_id is None:
+                self._ack("timer/activate", True, "Activated inactive timer(s)")
+            else:
+                self._ack("timer/activate", True, f"Timer activated: {timer_id}")
+        else:
+            if timer_id is None:
+                self._ack("timer/activate", False, "No inactive timers to activate")
+            else:
+                self._ack("timer/activate", False, f"Timer is not inactive: {timer_id}")
+
     def _cmd_timer_dismiss(self, payload: dict) -> None:
         timer_id_raw = payload.get("id")
         timer_id = str(timer_id_raw) if timer_id_raw is not None else None
@@ -1546,12 +1665,12 @@ class Daemon:
             if timer_id is None:
                 self._ack("timer/dismiss", True, "Dismissed active timer(s)")
             else:
-                self._ack("timer/dismiss", True, f"Timer dismiss/restart applied: {timer_id}")
+                self._ack("timer/dismiss", True, f"Timer dismissed: {timer_id}")
         else:
             if timer_id is None:
                 self._ack("timer/dismiss", False, "No active timers to dismiss")
             else:
-                self._ack("timer/dismiss", False, f"Timer not found: {timer_id}")
+                self._ack("timer/dismiss", False, f"Timer is not active: {timer_id}")
 
     def _cmd_state_request(self, payload: dict) -> None:
         self._publish_all_state()

@@ -78,6 +78,7 @@ class MQTTClient:
             "timer/cancel",
             "timer/remove",
             "timer/snooze",
+            "timer/activate",
             "timer/dismiss",
             "state/request",
         ):
@@ -85,6 +86,7 @@ class MQTTClient:
         client.subscribe(f"{self._prefix}/cmd/alarm/+/enabled/set")
         client.subscribe(f"{self._prefix}/cmd/alarm/+/time/set")
         client.subscribe(f"{self._prefix}/cmd/alarm/+/label/set")
+        client.subscribe(f"{self._prefix}/cmd/alarm/+/recurring/set")
         client.subscribe(f"{self._prefix}/cmd/alarm/+/weekdays/set")
         client.subscribe(f"{self._prefix}/cmd/alarm/+/weekday/+/set")
         client.subscribe(f"{self._prefix}/cmd/timer/+/label/set")

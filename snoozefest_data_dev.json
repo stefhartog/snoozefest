@@ -1,53 +1,50 @@
 {
-  "oneoffs": [
+  "alarms": [
     {
       "id": "1",
-      "time": "2026-03-28T17:00:00+00:00",
-      "label": "VA Alarm: 1800",
+      "time": "09:30",
+      "weekdays": [
+        5,
+        6
+      ],
+      "label": "Weekend",
       "enabled": true,
-      "temporary": true
+      "temporary": false,
+      "recurring": true,
+      "last_triggered_date": null,
+      "status": "active",
+      "triggered_at": null,
+      "snoozed_until": null
     },
     {
       "id": "2",
-      "time": "2026-03-28T18:00:00+00:00",
-      "label": "VA Alarm: 1900",
+      "time": "06:00",
+      "weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "label": "Weekdays",
       "enabled": true,
-      "temporary": true
-    },
-    {
-      "id": "3",
-      "time": "2026-03-28T15:40:00+00:00",
-      "label": "VA Alarm: 1640",
-      "enabled": true,
-      "temporary": true
+      "temporary": false,
+      "recurring": true,
+      "last_triggered_date": null,
+      "status": "active",
+      "triggered_at": null,
+      "snoozed_until": null
     }
   ],
-  "recurring": [],
   "timers": [
     {
       "id": "1",
-      "label": "VA Timer: 2",
-      "duration_seconds": 120,
-      "started_at": "2026-03-28T15:36:48.218438+00:00",
-      "expires_at": "2026-03-28T15:38:48.218438+00:00",
-      "status": "ringing",
-      "temporary": true
-    },
-    {
-      "id": "2",
-      "label": "VA Timer: 10",
+      "label": "Egg Timer",
       "duration_seconds": 600,
-      "started_at": "2026-03-28T15:37:15.418331+00:00",
-      "expires_at": "2026-03-28T15:47:15.418331+00:00",
-      "status": "ringing",
-      "temporary": true
-    }
-  ],
-  "active_alarms": [
-    {
-      "alarm_id": "3",
-      "triggered_at": "2026-03-28T15:40:00.495742+00:00",
-      "snoozed_until": null
+      "started_at": "2026-03-28T17:56:41.458020+00:00",
+      "expires_at": "2026-03-28T17:56:46.353473+00:00",
+      "status": "inactive",
+      "temporary": false
     }
   ]
 }

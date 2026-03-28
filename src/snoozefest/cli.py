@@ -73,10 +73,7 @@ def cmd_add_oneoff(ctx: click.Context, time_str: str, label: str) -> None:
         on_state_changed=lambda: None,
     )
     alarm = scheduler.add_oneoff_time(time_str, label)
-    click.echo(
-        f"Added one-off alarm {alarm.id}: {label!r} at {_friendly_local(alarm.time, config.timezone)} "
-        f"({alarm.time.isoformat()})"
-    )
+    click.echo(f"Added non-recurring alarm {alarm.id}: {label!r} at {alarm.time}")
 
 
 # ------------------------------------------------------------------ add-recurring
@@ -125,21 +122,15 @@ def cmd_list_alarms(ctx: click.Context) -> None:
     store = Store(config.data_file)
     state = store.state
 
-    if not state.oneoffs and not state.recurring:
+    if not state.alarms:
         click.echo("No alarms configured.")
         return
 
-    for a in state.oneoffs:
-        status = "enabled" if a.enabled else "disabled"
-        click.echo(
-            f"[oneoff]    {a.id}  {a.label!r}  {_friendly_local(a.time, config.timezone)} "
-            f"({a.time.isoformat()})  [{status}]"
-        )
-
-    for a in state.recurring:
+    for a in state.alarms:
         status = "enabled" if a.enabled else "disabled"
         days = ",".join(str(d) for d in a.weekdays)
-        click.echo(f"[recurring] {a.id}  {a.label!r}  {a.time}  days=[{days}]  [{status}]")
+        kind = "recurring" if a.recurring else "oneoff"
+        click.echo(f"[{kind}] {a.id}  {a.label!r}  {a.time}  days=[{days}]  [{status}]")
 
 
 # ------------------------------------------------------------------ show-next
