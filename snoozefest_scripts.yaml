@@ -1,3 +1,0 @@
-# Entity-driven setup now covers add/update/remove for alarms and timers.
-# Keep this file as an empty mapping so !include merges cleanly.
-{}

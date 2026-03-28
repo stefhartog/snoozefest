@@ -1,8 +1,8 @@
 {
   "mqtt_host": "homeassistant.local",
   "mqtt_port": 1883,
-  "mqtt_username": "mqtt",
-  "mqtt_password": "canon6dd",
+  "mqtt_username": "<your-mqtt-username>",
+  "mqtt_password": "<your-mqtt-password>",
   "mqtt_topic_prefix": "snoozefest",
   "mqtt_client_id": "snoozefest",
   "homeassistant_discovery_prefix": "homeassistant",

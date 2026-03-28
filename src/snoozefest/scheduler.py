@@ -138,22 +138,23 @@ class Scheduler:
         self._on_state_changed()
         return alarm
 
-    def add_oneoff_time(self, time_str: str, label: str) -> AlarmOneOff:
+    def add_oneoff_time(self, time_str: str, label: str, *, enabled: bool = True) -> AlarmOneOff:
         with self._lock:
             alarm_time = self._next_oneoff_utc_from_time(time_str)
-            alarm = AlarmOneOff(id=self._store.next_alarm_id(), time=alarm_time, label=label)
+            alarm = AlarmOneOff(id=self._store.next_alarm_id(), time=alarm_time, label=label, enabled=enabled)
             self._store.state.oneoffs.append(alarm)
             self._store.save()
         self._on_state_changed()
         return alarm
 
-    def add_recurring(self, time: str, weekdays: List[int], label: str) -> AlarmRecurring:
+    def add_recurring(self, time: str, weekdays: List[int], label: str, *, enabled: bool = True) -> AlarmRecurring:
         with self._lock:
             alarm = AlarmRecurring(
                 id=self._store.next_alarm_id(),
                 time=time,
                 weekdays=weekdays,
                 label=label,
+                enabled=enabled,
             )
             self._store.state.recurring.append(alarm)
             self._store.save()
@@ -394,7 +395,12 @@ class Scheduler:
             self._on_state_changed()
         return dismissed
 
-    def add_timer(self, duration_seconds: int, label: str) -> Timer:
+    def add_timer(self, duration_seconds: int, label: str, *, initial_status: str = "running") -> Timer:
+        if duration_seconds < 1:
+            raise ValueError("duration_seconds must be ≥ 1")
+        if initial_status not in {"running", "dismissed"}:
+            raise ValueError("initial_status must be 'running' or 'dismissed'")
+
         with self._lock:
             now_utc = self._now_utc()
             timer = Timer(
@@ -402,13 +408,31 @@ class Scheduler:
                 label=label,
                 duration_seconds=duration_seconds,
                 started_at=now_utc,
-                expires_at=now_utc + timedelta(seconds=duration_seconds),
-                status="running",
+                expires_at=(now_utc if initial_status == "dismissed" else now_utc + timedelta(seconds=duration_seconds)),
+                status=initial_status,
             )
             self._store.state.timers.append(timer)
             self._store.save()
         self._on_state_changed()
         return timer
+
+    def purge_all(self) -> tuple[int, int]:
+        with self._lock:
+            state = self._store.state
+            removed_alarms = len(state.oneoffs) + len(state.recurring)
+            removed_timers = len(state.timers)
+
+            if removed_alarms == 0 and removed_timers == 0 and not state.active_alarms:
+                return (0, 0)
+
+            state.oneoffs.clear()
+            state.recurring.clear()
+            state.timers.clear()
+            state.active_alarms.clear()
+            self._store.save()
+
+        self._on_state_changed()
+        return (removed_alarms, removed_timers)
 
     def update_timer(
         self,

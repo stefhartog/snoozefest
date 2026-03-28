@@ -1134,20 +1134,7 @@ class Daemon:
     # ------------------------------------------------------------------ individual handlers
 
     def _cmd_purge_all(self, payload: dict) -> None:
-        state = self._scheduler.full_state()
-        alarm_ids = [str(alarm.get("id")) for alarm in state.get("alarms", [])]
-        timer_ids = [str(timer.get("id")) for timer in state.get("timers", [])]
-
-        removed_alarms = 0
-        removed_timers = 0
-
-        for alarm_id in alarm_ids:
-            if self._scheduler.remove_alarm(alarm_id):
-                removed_alarms += 1
-
-        for timer_id in timer_ids:
-            if self._scheduler.cancel_timer(timer_id):
-                removed_timers += 1
+        removed_alarms, removed_timers = self._scheduler.purge_all()
 
         self._ack(
             "purge_all",
@@ -1158,8 +1145,7 @@ class Daemon:
     def _cmd_alarm_new(self, payload: dict) -> None:
         now_local = datetime.now(self._tz)
         default_time = (now_local + timedelta(minutes=1)).replace(second=0, microsecond=0).strftime("%H:%M")
-        alarm = self._scheduler.add_oneoff_time(default_time, "New Alarm")
-        self._scheduler.update_alarm(alarm.id, enabled=False)
+        alarm = self._scheduler.add_oneoff_time(default_time, "New Alarm", enabled=False)
         self._ack("alarm/new", True, f"One-off alarm created disabled: {alarm.id}")
 
     def _cmd_alarm_set(self, payload: dict) -> None:
@@ -1178,12 +1164,10 @@ class Daemon:
             raise ValueError("weekdays must be integers 0-6")
 
         if weekdays:
-            alarm = self._scheduler.add_recurring(time_str, weekdays, label)
-            self._scheduler.update_alarm(alarm.id, enabled=False)
+            alarm = self._scheduler.add_recurring(time_str, weekdays, label, enabled=False)
             self._ack("alarm/set", True, f"Recurring alarm created disabled: {alarm.id}")
         else:
-            alarm = self._scheduler.add_oneoff_time(time_str, label)
-            self._scheduler.update_alarm(alarm.id, enabled=False)
+            alarm = self._scheduler.add_oneoff_time(time_str, label, enabled=False)
             self._ack("alarm/set", True, f"One-off alarm created disabled: {alarm.id}")
 
     def _cmd_alarm_update(self, payload: dict) -> None:
@@ -1231,8 +1215,7 @@ class Daemon:
             self._ack("alarm/dismiss", False, "No active alarms to dismiss")
 
     def _cmd_timer_new(self, payload: dict) -> None:
-        timer = self._scheduler.add_timer(300, "New Timer")
-        self._scheduler.dismiss_timer(timer.id)
+        timer = self._scheduler.add_timer(300, "New Timer", initial_status="dismissed")
         self._ack("timer/new", True, f"Timer created dismissed: {timer.id}")
 
     def _cmd_timer_set(self, payload: dict) -> None:
@@ -1240,9 +1223,18 @@ class Daemon:
         if duration < 1:
             raise ValueError("duration_seconds must be ≥ 1")
         label = str(payload.get("label", "Timer"))
-        timer = self._scheduler.add_timer(duration, label)
-        self._scheduler.dismiss_timer(timer.id)
+        timer = self._scheduler.add_timer(duration, label, initial_status="dismissed")
         self._ack("timer/set", True, f"Timer created dismissed: {timer.id}")
+
+    def _publish_timer_runtime_state(self, state: dict) -> None:
+        timers: list[dict] = state.get("timers", [])
+        for timer in timers:
+            timer_id = str(timer.get("id"))
+            self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
+            self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_seconds(timer), retain=True)
+            self._mqtt.publish(self._timer_status_state_topic(timer_id), str(timer.get("status", "running")), retain=True)
+            self._mqtt.publish(self._timer_remaining_state_topic(timer_id), int(timer.get("remaining_seconds", 0)), retain=True)
+            self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
     def _cmd_timer_update(self, payload: dict) -> None:
         timer_id = str(payload["id"])
@@ -1318,7 +1310,7 @@ class Daemon:
             self._mqtt.publish_state("ringing_timer_count", self._ringing_timer_count(loop_state))
 
             if self._store.state.timers:
-                self._publish_timer_entities(loop_state)
+                self._publish_timer_runtime_state(loop_state)
 
             now = time.monotonic()
             if now - last_alarm_countdown_refresh >= _ALARM_COUNTDOWN_REFRESH_INTERVAL:

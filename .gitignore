@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Packaging/build metadata
+*.egg-info/
+build/
+dist/
+
+# Local runtime/config state
+config.json
+snoozefest_data.json
+
+# IDE noise
+.vscode/
