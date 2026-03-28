@@ -1,0 +1,152 @@
+alias: Snoozefest Voice Router
+mode: queued
+
+sequence:
+  - variables:
+      prefix: snoozefest_dev
+      action_name: "{{ action | default('') }}"
+      alarm_time: "{{ time | default('') }}"
+      alarm_time_normalized: >-
+        {% set raw = (time | default('') | string).strip() %}
+        {% set compact = raw | lower | replace(' ', '') | replace("o'clock", '') | replace('oclock', '') %}
+
+        {% if compact is match('^\\d{1,2}:\\d{2}$') %}
+          {{ compact }}
+        {% elif compact is match('^\\d{3,4}$') %}
+          {% if compact | length == 3 %}
+            {% set h = compact[0:1] | int %}
+            {% set m = compact[1:3] | int %}
+          {% else %}
+            {% set h = compact[0:2] | int %}
+            {% set m = compact[2:4] | int %}
+          {% endif %}
+          {% if 0 <= h <= 23 and 0 <= m <= 59 %}
+            {{ '%02d:%02d' | format(h, m) }}
+          {% else %}
+            {{ raw }}
+          {% endif %}
+        {% elif compact is match('^\\d{1,2}(:\\d{2})?(am|pm)$') %}
+          {% set suffix = compact[-2:] %}
+          {% set clock = compact[:-2] %}
+          {% if ':' in clock %}
+            {% set h = (clock.split(':')[0]) | int %}
+            {% set m = (clock.split(':')[1]) | int %}
+          {% else %}
+            {% set h = clock | int %}
+            {% set m = 0 %}
+          {% endif %}
+          {% if suffix == 'pm' and h < 12 %}
+            {% set h = h + 12 %}
+          {% elif suffix == 'am' and h == 12 %}
+            {% set h = 0 %}
+          {% endif %}
+          {% if 0 <= h <= 23 and 0 <= m <= 59 %}
+            {{ '%02d:%02d' | format(h, m) }}
+          {% else %}
+            {{ raw }}
+          {% endif %}
+        {% else %}
+          {{ raw }}
+        {% endif %}
+      alarm_label: "{{ label | default('Voice Alarm') }}"
+      timer_label: "{{ label | default('Voice Timer') }}"
+      is_temporary: "{{ temporary | default(false) }}"
+      duration_text_raw: "{{ duration_text | default(minutes | default('')) }}"
+      timer_secs: >-
+        {% set ds = duration_seconds | default(0) | int %}
+        {% set mins_raw = (duration_text_raw | string | lower | trim) %}
+        {% set mins_map = {
+          'zero': 0,
+          'a': 1,
+          'an': 1,
+          'one': 1,
+          'two': 2,
+          'three': 3,
+          'four': 4,
+          'five': 5,
+          'six': 6,
+          'seven': 7,
+          'eight': 8,
+          'nine': 9,
+          'ten': 10
+        } %}
+        {% set mins = mins_map.get(mins_raw, mins_raw | int(0)) %}
+        {{ ds if ds > 0 else mins * 60 }}
+
+  - choose:
+      - conditions: "{{ action_name == 'set_alarm' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ prefix }}/cmd/alarm/new"
+              payload: >-
+                {{ {'time': alarm_time_normalized, 'label': alarm_label, 'temporary': is_temporary} | tojson }}
+
+      - conditions: "{{ action_name == 'set_timer' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ prefix }}/cmd/timer/new"
+              payload: >-
+                {{ {'duration_seconds': timer_secs, 'duration_text': duration_text_raw, 'label': timer_label, 'temporary': is_temporary} | tojson }}
+
+      - conditions: "{{ action_name == 'snooze_alarm' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ prefix }}/cmd/alarm/snooze"
+              payload: >-
+                {{ ({'id': alarm_id} if alarm_id is defined and alarm_id else {}) | tojson }}
+
+      - conditions: "{{ action_name == 'dismiss_alarm' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ prefix }}/cmd/alarm/dismiss"
+              payload: >-
+                {{ ({'id': alarm_id} if alarm_id is defined and alarm_id else {}) | tojson }}
+
+      - conditions: "{{ action_name == 'snooze_timer' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ prefix }}/cmd/timer/snooze"
+              payload: >-
+                {{ ({'id': timer_id} if timer_id is defined and timer_id else {}) | tojson }}
+
+      - conditions: "{{ action_name == 'dismiss_timer' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ prefix }}/cmd/timer/dismiss"
+              payload: >-
+                {{ ({'id': timer_id} if timer_id is defined and timer_id else {}) | tojson }}
+
+    default:
+      - service: persistent_notification.create
+        data:
+          title: Snoozefest Voice Router
+          message: "Unknown action: {{ action_name }}"
+
+# Example service calls for automations
+# 1) Set alarm from sentence slot:
+# - service: script.snoozefest_voice_router
+#   data:
+#     action: set_alarm
+#     time: "{{ trigger.slots.time }}"
+#
+# 2) Set timer from sentence slot:
+# - service: script.snoozefest_voice_router
+#   data:
+#     action: set_timer
+#     minutes: "{{ trigger.slots.minutes }}"
+#
+# 3) Dismiss current alarm:
+# - service: script.snoozefest_voice_router
+#   data:
+#     action: dismiss_alarm
+#
+# 4) Snooze current alarm:
+# - service: script.snoozefest_voice_router
+#   data:
+#     action: snooze_alarm

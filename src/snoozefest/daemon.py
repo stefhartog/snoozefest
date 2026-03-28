@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import signal
 import time
 from datetime import datetime, timedelta, timezone
@@ -91,10 +92,12 @@ class Daemon:
 
     def _publish_all_state(self) -> None:
         state = self._scheduler.full_state()
+        ringing_alarm_count = self._ringing_alarm_count(state)
         ringing_timer_count = self._ringing_timer_count(state)
         self._mqtt.publish_state("alarms", state["alarms"])
         self._mqtt.publish_state("timers", state["timers"])
         self._mqtt.publish_state("active_alarm", state["active_alarm"])
+        self._mqtt.publish_state("ringing_alarm_count", ringing_alarm_count)
         self._mqtt.publish_state("ringing_timer_count", ringing_timer_count)
         self._mqtt.publish_state("next_alarm", state["next_alarm"])
         self._publish_manager_entities()
@@ -144,6 +147,11 @@ class Daemon:
         self._mqtt.publish(self._manager_add_alarm_discovery_topic(), add_alarm_payload, retain=True)
         self._mqtt.publish(self._manager_add_timer_discovery_topic(), add_timer_payload, retain=True)
         self._mqtt.publish(self._manager_purge_all_discovery_topic(), purge_all_payload, retain=True)
+
+    @staticmethod
+    def _ringing_alarm_count(state: dict) -> int:
+        active_alarm = state.get("active_alarm", {})
+        return len(active_alarm.get("ringing", []))
 
     @staticmethod
     def _ringing_timer_count(state: dict) -> int:
@@ -392,29 +400,45 @@ class Daemon:
     @staticmethod
     def _alarm_time_value(alarm: dict) -> str:
         if str(alarm.get("kind", "")) == "recurring":
-            return str(alarm.get("time") or "")
+            recurring = str(alarm.get("time") or "")
+            if recurring and len(recurring) == 5:
+                return f"{recurring}:00"
+            return recurring
 
         friendly = str(alarm.get("time_friendly") or "")
-        if len(friendly) >= 16:
-            return friendly[11:16]
+        if len(friendly) >= 19:
+            return friendly[11:19]
 
         local_time = str(alarm.get("time_local") or "")
-        if len(local_time) >= 16:
-            return local_time[11:16]
+        if len(local_time) >= 19:
+            return local_time[11:19]
 
         raw = str(alarm.get("time") or "")
-        if "T" in raw and len(raw) >= 16:
-            return raw[11:16]
+        if "T" in raw and len(raw) >= 19:
+            return raw[11:19]
         return raw
 
     def _alarm_time_entity_value(self, alarm: dict) -> str:
         base = self._alarm_time_value(alarm)
         if not base:
             fallback = (datetime.now(self._tz) + timedelta(minutes=1)).replace(second=0, microsecond=0)
-            return fallback.strftime("%H:%M")
-        if len(base) >= 5:
-            return base[:5]
+            return fallback.strftime("%H:%M:%S")
+        if len(base) >= 8:
+            return base[:8]
+        if len(base) == 5:
+            return f"{base}:00"
         return base
+
+    @staticmethod
+    def _seconds_to_hhmmss(total_seconds: int) -> str:
+        total_seconds = max(0, int(total_seconds))
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    def _timer_remaining_entity_value(self, timer: dict) -> str:
+        remaining = int(timer.get("remaining_seconds", 0))
+        return self._seconds_to_hhmmss(remaining)
 
     @staticmethod
     def _alarm_status_map(active_alarm: dict) -> dict[str, str]:
@@ -424,6 +448,28 @@ class Daemon:
         for entry in active_alarm.get("snoozed", []):
             status_by_id[str(entry.get("alarm_id"))] = "snoozed"
         return status_by_id
+
+    @staticmethod
+    def _normalized_alarm_status_fallback(alarm: dict, runtime_status: str) -> str:
+        status = str(runtime_status).strip().lower()
+        if status == "ringing":
+            return "Ringing"
+        if status == "snoozed":
+            return "Snoozed"
+        if not bool(alarm.get("enabled", True)):
+            return "Inactive"
+        return "Active"
+
+    @staticmethod
+    def _normalized_timer_status_fallback(timer_status: str) -> str:
+        status = str(timer_status).strip().lower()
+        if status == "ringing":
+            return "Ringing"
+        if status == "snoozed":
+            return "Snoozed"
+        if status == "running":
+            return "Active"
+        return "Inactive"
 
     def _timer_object_id(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}_timer_{timer_id}"
@@ -462,6 +508,12 @@ class Daemon:
         )
 
     def _timer_duration_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._timer_duration_object_id(timer_id)}/config"
+        )
+
+    def _timer_duration_discovery_topic_legacy(self, timer_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/number/"
             f"{self._timer_duration_object_id(timer_id)}/config"
@@ -520,6 +572,9 @@ class Daemon:
     def _timer_duration_seconds(timer: dict) -> int:
         return max(1, int(timer.get("duration_seconds", 1)))
 
+    def _timer_duration_entity_value(self, timer: dict) -> str:
+        return self._seconds_to_hhmmss(self._timer_duration_seconds(timer))
+
     def _publish_timer_entities(self, state: dict) -> None:
         if not self._config.homeassistant_discovery_prefix:
             return
@@ -543,7 +598,7 @@ class Daemon:
                 "device": self._timer_device(timer, timer_id),
             }
             duration_payload = {
-                "name": "02 Duration (s)",
+                "name": "02 Duration",
                 "unique_id": self._timer_duration_object_id(timer_id),
                 "object_id": self._timer_duration_object_id(timer_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
@@ -552,11 +607,8 @@ class Daemon:
                 "state_topic": self._timer_duration_state_topic(timer_id),
                 "command_topic": self._timer_duration_command_topic(timer_id),
                 "icon": "mdi:timer-edit-outline",
-                "mode": "box",
-                "min": 1,
-                "max": 86400,
-                "step": 1,
-                "unit_of_measurement": "s",
+                "pattern": "^(\\d{1,2}:)?[0-5]?\\d:[0-5]\\d$",
+                "mode": "text",
                 "device": self._timer_device(timer, timer_id),
             }
             status_payload = {
@@ -580,7 +632,6 @@ class Daemon:
                 "payload_not_available": "false",
                 "state_topic": self._timer_remaining_state_topic(timer_id),
                 "icon": "mdi:timer-sand",
-                "unit_of_measurement": "s",
                 "device": self._timer_device(timer, timer_id),
             }
             remove_payload = {
@@ -621,6 +672,7 @@ class Daemon:
             }
 
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), label_payload, retain=True)
+            self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), duration_payload, retain=True)
             self._mqtt.publish(self._timer_status_discovery_topic(timer_id), status_payload, retain=True)
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), remaining_payload, retain=True)
@@ -628,14 +680,19 @@ class Daemon:
             self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), snooze_payload, retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), dismiss_payload, retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
-            self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_seconds(timer), retain=True)
-            self._mqtt.publish(self._timer_status_state_topic(timer_id), str(timer.get("status", "running")), retain=True)
-            self._mqtt.publish(self._timer_remaining_state_topic(timer_id), int(timer.get("remaining_seconds", 0)), retain=True)
+            self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
+            self._mqtt.publish(
+                self._timer_status_state_topic(timer_id),
+                str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "running")))),
+                retain=True,
+            )
+            self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
         removed_ids = previous_ids - current_ids
         for timer_id in removed_ids:
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), "", retain=True)
@@ -662,7 +719,7 @@ class Daemon:
         for alarm in alarms:
             alarm_id = str(alarm["id"])
             config_payload = {
-                "name": "01 Enabled",
+                "name": "03 Enabled",
                 "unique_id": self._alarm_object_id(alarm_id),
                 "object_id": self._alarm_object_id(alarm_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
@@ -726,14 +783,14 @@ class Daemon:
                 "device": self._alarm_device(alarm, alarm_id),
             }
             eta_payload = {
-                "name": "07 ETA",
+                "name": "07 Remaining",
                 "unique_id": self._alarm_eta_object_id(alarm_id),
                 "object_id": self._alarm_eta_object_id(alarm_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
                 "payload_available": "true",
                 "payload_not_available": "false",
                 "state_topic": self._alarm_eta_state_topic(alarm_id),
-                "icon": "mdi:calendar-clock",
+                "icon": "mdi:timer-sand",
                 "device": self._alarm_device(alarm, alarm_id),
             }
             kind_payload = {
@@ -749,7 +806,7 @@ class Daemon:
                 "device": self._alarm_device(alarm, alarm_id),
             }
             label_payload = {
-                "name": "03 Label",
+                "name": "01 Label",
                 "unique_id": self._alarm_label_object_id(alarm_id),
                 "object_id": self._alarm_label_object_id(alarm_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
@@ -769,7 +826,7 @@ class Daemon:
                 "payload_not_available": "false",
                 "state_topic": self._alarm_time_state_topic(alarm_id),
                 "command_topic": self._alarm_time_command_topic(alarm_id),
-                "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$",
+                "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)(:([0-5]\\d))?$",
                 "mode": "text",
                 "icon": "mdi:clock-time-four-outline",
                 "device": self._alarm_device(alarm, alarm_id),
@@ -806,7 +863,11 @@ class Daemon:
             for wd, wd_payload in enumerate(weekday_switch_payloads):
                 self._mqtt.publish(self._alarm_weekday_discovery_topic(alarm_id, wd), wd_payload, retain=True)
             self._mqtt.publish(self._alarm_enabled_state_topic(alarm_id), "ON" if alarm.get("enabled", True) else "OFF", retain=True)
-            self._mqtt.publish(self._alarm_status_state_topic(alarm_id), status_by_id.get(alarm_id, "idle"), retain=True)
+            self._mqtt.publish(
+                self._alarm_status_state_topic(alarm_id),
+                str(alarm.get("status_normalized") or self._normalized_alarm_status_fallback(alarm, status_by_id.get(alarm_id, "idle"))),
+                retain=True,
+            )
             self._mqtt.publish(self._alarm_kind_state_topic(alarm_id), str(alarm.get("kind", "oneoff")), retain=True)
             self._mqtt.publish(self._alarm_label_state_topic(alarm_id), str(alarm.get("label", "Alarm")), retain=True)
             self._mqtt.publish(self._alarm_time_state_topic(alarm_id), self._alarm_time_entity_value(alarm), retain=True)
@@ -851,22 +912,24 @@ class Daemon:
     def _alarm_eta_state(self, alarm: dict, status_by_id: dict[str, str]) -> str:
         alarm_id = str(alarm.get("id", ""))
         status = status_by_id.get(alarm_id, "idle")
-        if status == "ringing":
-            return "ringing now"
-        if status == "snoozed":
-            return "snoozed"
+        if status in {"ringing", "snoozed"}:
+            return "00:00:00"
         if not alarm.get("enabled", True):
-            return "disabled"
+            return ""
 
         next_trigger = self._next_alarm_trigger_utc(alarm)
         if next_trigger is None:
-            return "not scheduled"
+            return ""
 
         now_utc = datetime.now(timezone.utc)
         remaining_seconds = int((next_trigger - now_utc).total_seconds())
         if remaining_seconds <= 0:
-            return "due now"
-        return f"in {self._format_eta_duration(remaining_seconds)}"
+            return "00:00:00"
+
+        total_minutes = remaining_seconds // 60
+        days, rem_minutes = divmod(total_minutes, 24 * 60)
+        hours, minutes = divmod(rem_minutes, 60)
+        return f"{days:02d}:{hours:02d}:{minutes:02d}"
 
     def _next_alarm_trigger_utc(self, alarm: dict) -> Optional[datetime]:
         now_utc = datetime.now(timezone.utc)
@@ -930,6 +993,146 @@ class Daemon:
         if len(parts) == 2:
             return f"{parts[0]} and {parts[1]}"
         return f"{parts[0]}, {parts[1]} and {parts[2]}"
+
+    @staticmethod
+    def _words_to_number(text: str) -> Optional[float]:
+        raw = str(text).strip().lower()
+        if raw == "":
+            return None
+
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+
+        # Handle "one and a half", "two and half", etc.
+        half_match = re.fullmatch(r"(.+?)\s+and\s+(?:a\s+)?half", raw)
+        if half_match:
+            base = Daemon._words_to_number(half_match.group(1))
+            if base is None:
+                return None
+            return base + 0.5
+
+        if raw in {"half", "a half", "an half"}:
+            return 0.5
+
+        unit_words = {
+            "zero": 0,
+            "a": 1,
+            "an": 1,
+            "one": 1,
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+            "six": 6,
+            "seven": 7,
+            "eight": 8,
+            "nine": 9,
+            "ten": 10,
+            "eleven": 11,
+            "twelve": 12,
+            "thirteen": 13,
+            "fourteen": 14,
+            "fifteen": 15,
+            "sixteen": 16,
+            "seventeen": 17,
+            "eighteen": 18,
+            "nineteen": 19,
+        }
+        tens_words = {
+            "twenty": 20,
+            "thirty": 30,
+            "forty": 40,
+            "fifty": 50,
+            "sixty": 60,
+            "seventy": 70,
+            "eighty": 80,
+            "ninety": 90,
+        }
+
+        tokens = [t for t in re.split(r"[\s-]+", raw) if t and t != "and"]
+        if not tokens:
+            return None
+
+        total = 0.0
+        current = 0.0
+        for tok in tokens:
+            if tok in unit_words:
+                current += unit_words[tok]
+            elif tok in tens_words:
+                current += tens_words[tok]
+            elif tok == "hundred":
+                current = max(1.0, current) * 100.0
+            elif tok == "half":
+                current += 0.5
+            else:
+                return None
+
+        total += current
+        return total
+
+    @classmethod
+    def _parse_duration_seconds(cls, payload: dict, *, default_seconds: int = 300) -> int:
+        raw_seconds = payload.get("duration_seconds")
+        if raw_seconds is not None:
+            seconds = int(raw_seconds)
+            if seconds > 0:
+                return seconds
+
+        raw_text = payload.get("duration_text")
+        if raw_text is None:
+            raw_text = payload.get("minutes")
+
+        if raw_text is None:
+            return default_seconds
+
+        text = str(raw_text).strip().lower()
+        if text == "":
+            return default_seconds
+
+        unit_seconds = {
+            "h": 3600,
+            "hr": 3600,
+            "hrs": 3600,
+            "hour": 3600,
+            "hours": 3600,
+            "m": 60,
+            "min": 60,
+            "mins": 60,
+            "minute": 60,
+            "minutes": 60,
+            "s": 1,
+            "sec": 1,
+            "secs": 1,
+            "second": 1,
+            "seconds": 1,
+        }
+
+        total_seconds = 0.0
+        pattern = re.compile(
+            r"(?P<value>[a-z0-9\.\-\s]+?)\s*(?P<unit>hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b"
+        )
+
+        for match in pattern.finditer(text):
+            value_text = match.group("value").strip()
+            value_text = re.sub(r"^and\s+", "", value_text)
+            value = cls._words_to_number(value_text)
+            if value is None:
+                continue
+            unit = match.group("unit")
+            total_seconds += value * unit_seconds[unit]
+
+        if total_seconds <= 0:
+            # Backward-compatible fallback: plain number means minutes.
+            plain = cls._words_to_number(text)
+            if plain is not None and plain > 0:
+                total_seconds = plain * 60
+
+        seconds_int = int(round(total_seconds))
+        if seconds_int < 1:
+            raise ValueError("duration must be at least 1 second")
+        return seconds_int
 
     # ------------------------------------------------------------------ MQTT command dispatch
 
@@ -1113,14 +1316,26 @@ class Daemon:
 
         if field == "duration":
             if isinstance(payload, (int, float)):
-                duration_seconds = int(payload)
+                duration_seconds = self._parse_duration_seconds({"duration_seconds": int(payload)}, default_seconds=300)
             elif isinstance(payload, str):
-                duration_seconds = int(float(payload.strip()))
+                text = payload.strip()
+                if text == "":
+                    raise ValueError("Timer duration payload must not be empty")
+                if ":" in text:
+                    parts = [int(p) for p in text.split(":")]
+                    if len(parts) == 2:
+                        hh, mm, ss = 0, parts[0], parts[1]
+                    elif len(parts) == 3:
+                        hh, mm, ss = parts
+                    else:
+                        raise ValueError("Timer duration must be HH:MM:SS or MM:SS")
+                    duration_seconds = hh * 3600 + mm * 60 + ss
+                    if duration_seconds < 1:
+                        raise ValueError("duration_seconds must be ≥ 1")
+                else:
+                    duration_seconds = self._parse_duration_seconds({"duration_text": text}, default_seconds=300)
             else:
-                raise TypeError("Timer duration payload must be numeric seconds")
-
-            if duration_seconds < 1:
-                raise ValueError("duration_seconds must be ≥ 1")
+                raise TypeError("Timer duration payload must be numeric, HH:MM:SS, or duration text")
 
             if self._scheduler.update_timer(timer_id, duration_seconds=duration_seconds):
                 self._ack(cmd, True, f"Timer duration updated: {timer_id}")
@@ -1149,10 +1364,29 @@ class Daemon:
         )
 
     def _cmd_alarm_new(self, payload: dict) -> None:
+        """Create a new one-off alarm. Payload can include:
+        - time: "HH:MM" string (default: now+1min)
+        - label: string (default: "New Alarm")
+        - enabled: bool (default: true when payload is non-empty, else false)
+        - temporary: bool (default: false)
+        """
         now_local = datetime.now(self._tz)
         default_time = (now_local + timedelta(minutes=1)).replace(second=0, microsecond=0).strftime("%H:%M")
-        alarm = self._scheduler.add_oneoff_time(default_time, "New Alarm", enabled=False)
-        self._ack("alarm/new", True, f"One-off alarm created disabled: {alarm.id}")
+        
+        time_str = payload.get("time", default_time)
+        label = payload.get("label", "New Alarm")
+        enabled = bool(payload.get("enabled", bool(payload)))
+        temporary = bool(payload.get("temporary", False))
+
+        alarm = self._scheduler.add_oneoff_time(
+            str(time_str),
+            str(label),
+            enabled=enabled,
+            temporary=temporary,
+        )
+        status = "enabled" if enabled else "disabled"
+        temp_suffix = " temporary" if temporary else ""
+        self._ack("alarm/new", True, f"One-off{temp_suffix} alarm created {status}: {alarm.id}")
 
     def _cmd_alarm_set(self, payload: dict) -> None:
         label = str(payload.get("label", "Alarm"))
@@ -1165,15 +1399,16 @@ class Daemon:
             time_str = dt.astimezone(self._tz).strftime("%H:%M")
 
         weekdays_raw = payload.get("weekdays")
+        temporary = bool(payload.get("temporary", False))
         weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else []
         if not all(0 <= d <= 6 for d in weekdays):
             raise ValueError("weekdays must be integers 0-6")
 
         if weekdays:
-            alarm = self._scheduler.add_recurring(time_str, weekdays, label, enabled=False)
+            alarm = self._scheduler.add_recurring(time_str, weekdays, label, enabled=False, temporary=temporary)
             self._ack("alarm/set", True, f"Recurring alarm created disabled: {alarm.id}")
         else:
-            alarm = self._scheduler.add_oneoff_time(time_str, label, enabled=False)
+            alarm = self._scheduler.add_oneoff_time(time_str, label, enabled=False, temporary=temporary)
             self._ack("alarm/set", True, f"One-off alarm created disabled: {alarm.id}")
 
     def _cmd_alarm_update(self, payload: dict) -> None:
@@ -1218,18 +1453,34 @@ class Daemon:
         if dismissed:
             self._ack("alarm/dismiss", True, f"Dismissed {len(dismissed)} alarm(s)")
         else:
-            self._ack("alarm/dismiss", False, "No active alarms to dismiss")
+            self._ack("alarm/dismiss", False, "No alarms to dismiss")
 
     def _cmd_timer_new(self, payload: dict) -> None:
-        timer = self._scheduler.add_timer(300, "New Timer", initial_status="dismissed")
-        self._ack("timer/new", True, f"Timer created dismissed: {timer.id}")
+        """Create a new timer. Payload can include:
+        - duration_seconds: int (default: 300)
+        - label: string (default: "New Timer")
+        - running: bool (default: true when payload is non-empty, else false)
+        - temporary: bool (default: false)
+        """
+        duration = self._parse_duration_seconds(payload, default_seconds=300)
+        
+        label = payload.get("label", "New Timer")
+        running = bool(payload.get("running", bool(payload)))
+        temporary = bool(payload.get("temporary", False))
+        initial_status = "running" if running else "dismissed"
+        timer = self._scheduler.add_timer(
+            duration,
+            str(label),
+            initial_status=initial_status,
+            temporary=temporary,
+        )
+        self._ack("timer/new", True, f"Timer created {initial_status}: {timer.id}")
 
     def _cmd_timer_set(self, payload: dict) -> None:
-        duration = int(payload["duration_seconds"])
-        if duration < 1:
-            raise ValueError("duration_seconds must be ≥ 1")
+        duration = self._parse_duration_seconds(payload, default_seconds=300)
         label = str(payload.get("label", "Timer"))
-        timer = self._scheduler.add_timer(duration, label, initial_status="dismissed")
+        temporary = bool(payload.get("temporary", False))
+        timer = self._scheduler.add_timer(duration, label, initial_status="dismissed", temporary=temporary)
         self._ack("timer/set", True, f"Timer created dismissed: {timer.id}")
 
     def _publish_timer_runtime_state(self, state: dict) -> None:
@@ -1237,9 +1488,13 @@ class Daemon:
         for timer in timers:
             timer_id = str(timer.get("id"))
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
-            self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_seconds(timer), retain=True)
-            self._mqtt.publish(self._timer_status_state_topic(timer_id), str(timer.get("status", "running")), retain=True)
-            self._mqtt.publish(self._timer_remaining_state_topic(timer_id), int(timer.get("remaining_seconds", 0)), retain=True)
+            self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
+            self._mqtt.publish(
+                self._timer_status_state_topic(timer_id),
+                str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "running")))),
+                retain=True,
+            )
+            self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
     def _cmd_timer_update(self, payload: dict) -> None:
@@ -1271,18 +1526,32 @@ class Daemon:
             self._ack("timer/remove", False, f"Timer not found: {timer_id}")
 
     def _cmd_timer_snooze(self, payload: dict) -> None:
-        timer_id = str(payload["id"])
+        timer_id_raw = payload.get("id")
+        timer_id = str(timer_id_raw) if timer_id_raw is not None else None
         if self._scheduler.snooze_timer(timer_id, seconds=60):
-            self._ack("timer/snooze", True, f"Timer snoozed: {timer_id}")
+            if timer_id is None:
+                self._ack("timer/snooze", True, "Snoozed ringing timer(s)")
+            else:
+                self._ack("timer/snooze", True, f"Timer snoozed: {timer_id}")
         else:
-            self._ack("timer/snooze", False, f"Timer is not ringing: {timer_id}")
+            if timer_id is None:
+                self._ack("timer/snooze", False, "No ringing timers to snooze")
+            else:
+                self._ack("timer/snooze", False, f"Timer is not ringing: {timer_id}")
 
     def _cmd_timer_dismiss(self, payload: dict) -> None:
-        timer_id = str(payload["id"])
+        timer_id_raw = payload.get("id")
+        timer_id = str(timer_id_raw) if timer_id_raw is not None else None
         if self._scheduler.dismiss_timer(timer_id):
-            self._ack("timer/dismiss", True, f"Timer dismiss/restart applied: {timer_id}")
+            if timer_id is None:
+                self._ack("timer/dismiss", True, "Dismissed active timer(s)")
+            else:
+                self._ack("timer/dismiss", True, f"Timer dismiss/restart applied: {timer_id}")
         else:
-            self._ack("timer/dismiss", False, f"Timer not found: {timer_id}")
+            if timer_id is None:
+                self._ack("timer/dismiss", False, "No active timers to dismiss")
+            else:
+                self._ack("timer/dismiss", False, f"Timer not found: {timer_id}")
 
     def _cmd_state_request(self, payload: dict) -> None:
         self._publish_all_state()
@@ -1313,6 +1582,7 @@ class Daemon:
             self._scheduler.tick()
 
             loop_state = self._scheduler.full_state()
+            self._mqtt.publish_state("ringing_alarm_count", self._ringing_alarm_count(loop_state))
             self._mqtt.publish_state("ringing_timer_count", self._ringing_timer_count(loop_state))
 
             if self._store.state.timers:

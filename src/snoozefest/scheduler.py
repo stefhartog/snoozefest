@@ -138,16 +138,37 @@ class Scheduler:
         self._on_state_changed()
         return alarm
 
-    def add_oneoff_time(self, time_str: str, label: str, *, enabled: bool = True) -> AlarmOneOff:
+    def add_oneoff_time(
+        self,
+        time_str: str,
+        label: str,
+        *,
+        enabled: bool = True,
+        temporary: bool = False,
+    ) -> AlarmOneOff:
         with self._lock:
             alarm_time = self._next_oneoff_utc_from_time(time_str)
-            alarm = AlarmOneOff(id=self._store.next_alarm_id(), time=alarm_time, label=label, enabled=enabled)
+            alarm = AlarmOneOff(
+                id=self._store.next_alarm_id(),
+                time=alarm_time,
+                label=label,
+                enabled=enabled,
+                temporary=temporary,
+            )
             self._store.state.oneoffs.append(alarm)
             self._store.save()
         self._on_state_changed()
         return alarm
 
-    def add_recurring(self, time: str, weekdays: List[int], label: str, *, enabled: bool = True) -> AlarmRecurring:
+    def add_recurring(
+        self,
+        time: str,
+        weekdays: List[int],
+        label: str,
+        *,
+        enabled: bool = True,
+        temporary: bool = False,
+    ) -> AlarmRecurring:
         with self._lock:
             alarm = AlarmRecurring(
                 id=self._store.next_alarm_id(),
@@ -155,6 +176,7 @@ class Scheduler:
                 weekdays=weekdays,
                 label=label,
                 enabled=enabled,
+                temporary=temporary,
             )
             self._store.state.recurring.append(alarm)
             self._store.save()
@@ -263,6 +285,7 @@ class Scheduler:
                         weekdays=normalized_weekdays or [],
                         label=str(label) if label is not None else oneoff.label,
                         enabled=bool(enabled) if enabled is not None else oneoff.enabled,
+                        temporary=oneoff.temporary,
                     )
                     state.oneoffs.remove(oneoff)
                     state.recurring.append(recurring)
@@ -297,6 +320,7 @@ class Scheduler:
                             time=self._next_oneoff_utc_from_time(oneoff_time),
                             label=str(label) if label is not None else recurring.label,
                             enabled=bool(enabled) if enabled is not None else recurring.enabled,
+                            temporary=recurring.temporary,
                         )
                         state.recurring.remove(recurring)
                         state.oneoffs.append(oneoff)
@@ -357,10 +381,17 @@ class Scheduler:
 
     def dismiss(self, alarm_id: Optional[str] = None) -> List[str]:
         """
-        Dismiss active alarm(s) — ringing or snoozed.
+        Dismiss alarm(s).
 
+        Active alarm behavior:
         - One-off: sets enabled=False.
         - Recurring: sets last_triggered_date to today; alarm stays enabled.
+
+        Idle behavior:
+        - If alarm_id is provided and no active alarm matches, dismiss that alarm by ID.
+        - If alarm_id is omitted and no active alarms exist, dismiss the next scheduled alarm.
+        - One-off idle dismiss: sets enabled=False (or removes if temporary).
+        - Recurring idle dismiss: sets enabled=False (or removes if temporary).
 
         Returns list of dismissed alarm IDs.
         """
@@ -380,13 +411,49 @@ class Scheduler:
 
                 for alarm in state.oneoffs:
                     if alarm.id == active.alarm_id:
-                        alarm.enabled = False
+                        if alarm.temporary:
+                            state.oneoffs.remove(alarm)
+                        else:
+                            alarm.enabled = False
                         break
 
                 for alarm in state.recurring:
                     if alarm.id == active.alarm_id:
-                        alarm.last_triggered_date = today
+                        if alarm.temporary:
+                            state.recurring.remove(alarm)
+                        else:
+                            alarm.last_triggered_date = today
                         break
+
+            # If nothing active was dismissed, allow dismissing idle alarms.
+            if not dismissed:
+                target_alarm_id: Optional[str] = alarm_id
+                if target_alarm_id is None:
+                    next_alarm = self._next_alarm_unlocked()
+                    if next_alarm is not None:
+                        target_alarm_id = str(next_alarm.get("alarm_id") or "")
+                        if target_alarm_id == "":
+                            target_alarm_id = None
+
+                if target_alarm_id is not None:
+                    for alarm in state.oneoffs:
+                        if alarm.id == target_alarm_id:
+                            if alarm.temporary:
+                                state.oneoffs.remove(alarm)
+                            else:
+                                alarm.enabled = False
+                            dismissed.append(target_alarm_id)
+                            break
+
+                    if not dismissed:
+                        for alarm in state.recurring:
+                            if alarm.id == target_alarm_id:
+                                if alarm.temporary:
+                                    state.recurring.remove(alarm)
+                                else:
+                                    alarm.enabled = False
+                                dismissed.append(target_alarm_id)
+                                break
 
             if dismissed:
                 self._store.save()
@@ -395,7 +462,14 @@ class Scheduler:
             self._on_state_changed()
         return dismissed
 
-    def add_timer(self, duration_seconds: int, label: str, *, initial_status: str = "running") -> Timer:
+    def add_timer(
+        self,
+        duration_seconds: int,
+        label: str,
+        *,
+        initial_status: str = "running",
+        temporary: bool = False,
+    ) -> Timer:
         if duration_seconds < 1:
             raise ValueError("duration_seconds must be ≥ 1")
         if initial_status not in {"running", "dismissed"}:
@@ -410,6 +484,7 @@ class Scheduler:
                 started_at=now_utc,
                 expires_at=(now_utc if initial_status == "dismissed" else now_utc + timedelta(seconds=duration_seconds)),
                 status=initial_status,
+                temporary=temporary,
             )
             self._store.state.timers.append(timer)
             self._store.save()
@@ -471,48 +546,57 @@ class Scheduler:
             self._on_state_changed()
         return found
 
-    def snooze_timer(self, timer_id: str, seconds: int = 60) -> bool:
+    def snooze_timer(self, timer_id: Optional[str] = None, seconds: int = 60) -> bool:
         with self._lock:
             now_utc = self._now_utc()
+            changed = False
             for timer in self._store.state.timers:
-                if timer.id == timer_id and timer.status == "ringing":
+                if (timer_id is None or timer.id == timer_id) and timer.status == "ringing":
                     timer.expires_at = now_utc + timedelta(seconds=seconds)
                     timer.status = "snoozed"
-                    self._store.save()
-                    found = True
-                    break
-            else:
-                found = False
-        if found:
-            self._on_state_changed()
-        return found
+                    changed = True
+                    if timer_id is not None:
+                        break
 
-    def dismiss_timer(self, timer_id: str) -> bool:
+            if changed:
+                self._store.save()
+
+        if changed:
+            self._on_state_changed()
+        return changed
+
+    def dismiss_timer(self, timer_id: Optional[str] = None) -> bool:
         with self._lock:
             now_utc = self._now_utc()
+            changed = False
             for timer in self._store.state.timers:
-                if timer.id != timer_id:
+                if timer_id is not None and timer.id != timer_id:
                     continue
 
                 if timer.status in {"running", "ringing", "snoozed"}:
-                    timer.status = "dismissed"
-                    timer.expires_at = now_utc
-                    self._store.save()
-                    found = True
-                    break
+                    if timer.temporary:
+                        self._store.state.timers.remove(timer)
+                    else:
+                        timer.status = "dismissed"
+                        timer.expires_at = now_utc
+                    changed = True
+                    if timer_id is not None:
+                        break
+                    continue
 
-                if timer.status == "dismissed":
+                if timer_id is not None and timer.status == "dismissed":
                     timer.started_at = now_utc
                     timer.expires_at = now_utc + timedelta(seconds=timer.duration_seconds)
                     timer.status = "running"
-                    self._store.save()
-                    found = True
+                    changed = True
                     break
-            else:
-                found = False
-        if found:
+
+            if changed:
+                self._store.save()
+
+        if changed:
             self._on_state_changed()
-        return found
+        return changed
 
     def cancel_timer(self, timer_id: str) -> bool:
         with self._lock:
@@ -631,10 +715,55 @@ class Scheduler:
             parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
         return " ".join(parts)
 
+    @staticmethod
+    def _normalize_timer_status(status: str) -> tuple[str, str]:
+        timer_status = str(status).strip().lower()
+        if timer_status == "ringing":
+            return ("Ringing", "ringing")
+        if timer_status == "snoozed":
+            return ("Snoozed", "snoozed")
+        if timer_status == "running":
+            return ("Active", "running")
+        if timer_status == "dismissed":
+            return ("Inactive", "dismissed")
+        return ("Inactive", "unknown")
+
+    @staticmethod
+    def _alarm_runtime_status_map(state: AppState) -> dict[str, str]:
+        status_by_alarm_id: dict[str, str] = {}
+        for active in state.active_alarms:
+            status_by_alarm_id[active.alarm_id] = "ringing" if active.is_ringing else "snoozed"
+        return status_by_alarm_id
+
+    def _normalize_alarm_status(
+        self,
+        alarm: AlarmOneOff | AlarmRecurring,
+        runtime_status: str,
+        today_local_iso: str,
+    ) -> tuple[str, str]:
+        status = str(runtime_status).strip().lower()
+        if status == "ringing":
+            return ("Ringing", "ringing")
+        if status == "snoozed":
+            return ("Snoozed", "snoozed")
+
+        if not alarm.enabled:
+            return ("Inactive", "disabled")
+
+        if isinstance(alarm, AlarmRecurring) and alarm.last_triggered_date == today_local_iso:
+            return ("Inactive", "dismissed_for_today")
+
+        return ("Active", "scheduled")
+
     def _alarms_payload(self, state: AppState) -> list:
         out = []
+        runtime_status_by_id = self._alarm_runtime_status_map(state)
+        today_local_iso = self._now_local().date().isoformat()
+
         for a in state.oneoffs:
             dt = self._dt_payload(a.time)
+            runtime_status = runtime_status_by_id.get(a.id, "idle")
+            normalized_status, status_reason = self._normalize_alarm_status(a, runtime_status, today_local_iso)
             out.append({
                 "id": a.id, "kind": "oneoff",
                 "time": a.time.isoformat(),
@@ -644,34 +773,52 @@ class Scheduler:
                 "timezone": dt["timezone"],
                 "label": a.label,
                 "enabled": a.enabled,
+                "temporary": a.temporary,
+                "status": runtime_status,
+                "status_normalized": normalized_status,
+                "status_reason": status_reason,
             })
         for a in state.recurring:
+            runtime_status = runtime_status_by_id.get(a.id, "idle")
+            normalized_status, status_reason = self._normalize_alarm_status(a, runtime_status, today_local_iso)
             out.append({
                 "id": a.id, "kind": "recurring",
                 "time": a.time, "weekdays": a.weekdays,
                 "label": a.label, "enabled": a.enabled,
+                "temporary": a.temporary,
+                "last_triggered_date": a.last_triggered_date,
+                "status": runtime_status,
+                "status_normalized": normalized_status,
+                "status_reason": status_reason,
                 "timezone": str(self._tz),
             })
         return out
 
     def _timers_payload(self, state: AppState, now_utc: datetime) -> list:
-        return [
-            {
+        payload: list[dict] = []
+        for t in state.timers:
+            raw_status = str(t.status)
+            normalized_status, status_reason = self._normalize_timer_status(raw_status)
+            remaining_seconds = max(0, int((t.expires_at - now_utc).total_seconds()))
+            expires_payload = self._dt_payload(t.expires_at)
+            payload.append({
                 "id": t.id,
                 "label": t.label,
-                "status": t.status,
+                "status": raw_status,
+                "status_normalized": normalized_status,
+                "status_reason": status_reason,
+                "temporary": t.temporary,
                 "duration_seconds": t.duration_seconds,
                 "duration_friendly": self._format_duration(t.duration_seconds),
-                "remaining_seconds": max(0, int((t.expires_at - now_utc).total_seconds())),
-                "remaining_friendly": self._format_duration(max(0, int((t.expires_at - now_utc).total_seconds()))),
+                "remaining_seconds": remaining_seconds,
+                "remaining_friendly": self._format_duration(remaining_seconds),
                 "expires_at": t.expires_at.isoformat(),
-                "expires_at_utc": self._dt_payload(t.expires_at)["utc"],
-                "expires_at_local": self._dt_payload(t.expires_at)["local"],
-                "expires_at_friendly": self._dt_payload(t.expires_at)["friendly_local"],
+                "expires_at_utc": expires_payload["utc"],
+                "expires_at_local": expires_payload["local"],
+                "expires_at_friendly": expires_payload["friendly_local"],
                 "timezone": str(self._tz),
-            }
-            for t in state.timers
-        ]
+            })
+        return payload
 
     def _active_alarm_payload(self, state: AppState) -> dict:
         ringing = []
@@ -701,4 +848,16 @@ class Scheduler:
             status = "snoozed"
         else:
             status = "idle"
-        return {"status": status, "ringing": ringing, "snoozed": snoozed, "timezone": str(self._tz)}
+        normalized = {
+            "ringing": "Ringing",
+            "snoozed": "Snoozed",
+            "idle": "Inactive",
+        }[status]
+        return {
+            "status": status,
+            "status_normalized": normalized,
+            "status_reason": status,
+            "ringing": ringing,
+            "snoozed": snoozed,
+            "timezone": str(self._tz),
+        }

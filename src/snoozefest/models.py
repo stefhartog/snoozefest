@@ -11,6 +11,7 @@ class AlarmOneOff:
     label: str
     id: str
     enabled: bool = True
+    temporary: bool = False
 
 
 @dataclass
@@ -20,6 +21,7 @@ class AlarmRecurring:
     label: str
     id: str
     enabled: bool = True
+    temporary: bool = False
     last_triggered_date: Optional[str] = None   # "YYYY-MM-DD"; set on dismiss
 
 
@@ -31,6 +33,7 @@ class Timer:
     expires_at: datetime    # UTC
     id: str
     status: str = "running"
+    temporary: bool = False
 
 
 @dataclass

@@ -1,0 +1,274 @@
+alias: Snoozefest Voice Master Router
+description: Single Assist automation using trigger ids to route alarm and timer commands
+mode: single
+
+trigger:
+  - id: set_alarm
+    platform: conversation
+    command:
+      - set an alarm for {time}
+      - wake me up at {time}
+
+  - id: set_timer
+    platform: conversation
+    command:
+      - set a timer for {minutes} minutes
+      - set a timer for {minutes} minute
+      - start a {minutes} minute timer
+      - set a timer for {duration}
+      - start a timer for {duration}
+
+  - id: dismiss_alarm
+    platform: conversation
+    command:
+      - dismiss alarm
+      - stop alarm
+      - turn off alarm
+
+  - id: snooze_alarm
+    platform: conversation
+    command:
+      - snooze alarm
+      - snooze the alarm
+
+  - id: dismiss_timer
+    platform: conversation
+    command:
+      - dismiss timer
+      - stop timer
+      - turn off timer
+
+  - id: snooze_timer
+    platform: conversation
+    command:
+      - snooze timer
+      - snooze the timer
+
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - set_alarm
+        sequence:
+          - variables:
+              requested_time: "{{ trigger.slots.time }}"
+              request_label: "Voice Pending {{ now().strftime('%H%M%S%f') }}"
+          - service: script.snoozefest_voice_router
+            data:
+              action: set_alarm
+              time: "{{ requested_time }}"
+              label: "{{ request_label }}"
+              temporary: true
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: snoozefest_dev/state/alarms
+                value_template: "{{ value_json | selectattr('label', 'equalto', request_label) | list | count > 0 }}"
+            timeout: "00:00:02"
+            continue_on_timeout: true
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json | selectattr('label', 'equalto', request_label) | list | count > 0) }}"
+                sequence:
+                  - variables:
+                      created_alarm: >-
+                        {{ (wait.trigger.payload_json | selectattr('label', 'equalto', request_label) | list | first) }}
+                      created_alarm_id: >-
+                        {{ created_alarm.id | default('') }}
+                      created_alarm_status: >-
+                        {{ created_alarm.status_normalized | default(created_alarm.status | default('Active')) }}
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ created_alarm_id != '' }}"
+                        sequence:
+                          - service: mqtt.publish
+                            data:
+                              topic: snoozefest_dev/cmd/alarm/update
+                              payload: >-
+                                {{ {'id': created_alarm_id, 'label': 'VA Alarm: ' ~ requested_time} | tojson }}
+                  - set_conversation_response: >-
+                      Alarm set for {{ requested_time }}.
+            default:
+              - set_conversation_response: >-
+                  Sorry, I could not set that alarm.
+
+      - conditions:
+          - condition: trigger
+            id:
+              - set_timer
+        sequence:
+          - variables:
+              requested_duration: "{{ trigger.slots.duration | default(trigger.slots.minutes | default('')) }}"
+              timer_request_label: "VA Timer Pending {{ now().strftime('%H%M%S%f') }}"
+          - service: script.snoozefest_voice_router
+            data:
+              action: set_timer
+              duration_text: "{{ requested_duration }}"
+              label: "{{ timer_request_label }}"
+              temporary: true
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: snoozefest_dev/state/timers
+                value_template: "{{ value_json | selectattr('label', 'equalto', timer_request_label) | list | count > 0 }}"
+            timeout: "00:00:02"
+            continue_on_timeout: true
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json | selectattr('label', 'equalto', timer_request_label) | list | count > 0) }}"
+                sequence:
+                  - variables:
+                      created_timer: >-
+                        {{ (wait.trigger.payload_json | selectattr('label', 'equalto', timer_request_label) | list | first) }}
+                      created_timer_id: >-
+                        {{ created_timer.id | default('') }}
+                      created_timer_status: >-
+                        {{ created_timer.status_normalized | default(created_timer.status | default('Active')) }}
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ created_timer_id != '' }}"
+                        sequence:
+                          - service: mqtt.publish
+                            data:
+                              topic: snoozefest_dev/cmd/timer/update
+                              payload: >-
+                                {{ {'id': created_timer_id, 'label': 'VA Timer: ' ~ requested_duration} | tojson }}
+                  - set_conversation_response: >-
+                      Timer set for {{ requested_duration }}.
+            default:
+              - set_conversation_response: >-
+                  Sorry, I could not set that timer.
+
+      - conditions:
+          - condition: trigger
+            id:
+              - dismiss_alarm
+        sequence:
+          - service: script.snoozefest_voice_router
+            data:
+              action: dismiss_alarm
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: snoozefest_dev/state/command_result
+                value_template: "{{ value_json.command == 'alarm/dismiss' }}"
+            timeout: "00:00:02"
+            continue_on_timeout: true
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      Dismissed.
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      No alarm found in Active or Ringing state to dismiss.
+            default:
+              - set_conversation_response: >-
+                  Dismissed.
+
+      - conditions:
+          - condition: trigger
+            id:
+              - snooze_alarm
+        sequence:
+          - service: script.snoozefest_voice_router
+            data:
+              action: snooze_alarm
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: snoozefest_dev/state/command_result
+                value_template: "{{ value_json.command == 'alarm/snooze' }}"
+            timeout: "00:00:02"
+            continue_on_timeout: true
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      Snoozing.
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      No alarm found in Ringing state to snooze.
+            default:
+              - set_conversation_response: >-
+                  Snoozing.
+
+      - conditions:
+          - condition: trigger
+            id:
+              - dismiss_timer
+        sequence:
+          - service: script.snoozefest_voice_router
+            data:
+              action: dismiss_timer
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: snoozefest_dev/state/command_result
+                value_template: "{{ value_json.command == 'timer/dismiss' }}"
+            timeout: "00:00:02"
+            continue_on_timeout: true
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      Dismissed.
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      No timer found in Active, Snoozed, or Ringing state to dismiss.
+            default:
+              - set_conversation_response: >-
+                  Dismissed.
+
+      - conditions:
+          - condition: trigger
+            id:
+              - snooze_timer
+        sequence:
+          - service: script.snoozefest_voice_router
+            data:
+              action: snooze_timer
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: snoozefest_dev/state/command_result
+                value_template: "{{ value_json.command == 'timer/snooze' }}"
+            timeout: "00:00:02"
+            continue_on_timeout: true
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      Snoozing.
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
+                sequence:
+                  - set_conversation_response: >-
+                      No timer found in Ringing state to snooze.
+            default:
+              - set_conversation_response: >-
+                  Snoozing.
+
+    default:
+      - service: persistent_notification.create
+        data:
+          title: Snoozefest Voice Master Automation
+          message: "No route for trigger id: {{ trigger.id | default('unknown') }}"

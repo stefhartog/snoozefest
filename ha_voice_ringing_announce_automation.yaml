@@ -1,0 +1,117 @@
+alias: Snoozefest Ringing Announcer
+description: Proactive VA announcement when alarms/timers begin ringing
+mode: single
+max_exceeded: silent
+
+trigger:
+  - id: alarm_ringing
+    platform: mqtt
+    topic: snoozefest_dev/state/ringing_alarm_count
+    value_template: "{{ (value | int(0)) > 0 }}"
+
+  - id: timer_ringing
+    platform: mqtt
+    topic: snoozefest_dev/state/ringing_timer_count
+    value_template: "{{ (value | int(0)) > 0 }}"
+
+action:
+  - service: mqtt.publish
+    data:
+      topic: snoozefest_dev/cmd/state/request
+      payload: "{}"
+
+  - wait_for_trigger:
+      - platform: mqtt
+        topic: snoozefest_dev/state/ringing_alarm_count
+    timeout: "00:00:01"
+    continue_on_timeout: true
+
+  - variables:
+      ringing_alarm_count: >-
+        {% if wait.trigger is not none %}
+          {{ wait.trigger.payload | int(0) }}
+        {% else %}
+          0
+        {% endif %}
+
+  - wait_for_trigger:
+      - platform: mqtt
+        topic: snoozefest_dev/state/ringing_timer_count
+    timeout: "00:00:01"
+    continue_on_timeout: true
+
+  - variables:
+      ringing_timer_count: >-
+        {% if wait.trigger is not none %}
+          {{ wait.trigger.payload | int(0) }}
+        {% else %}
+          0
+        {% endif %}
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ (ringing_alarm_count | int) > 0 or (ringing_timer_count | int) > 0 }}"
+        sequence:
+          - variables:
+              announce_message: >-
+                {% if (ringing_alarm_count | int) > 0 and (ringing_timer_count | int) > 0 %}
+                  Alarm and timer ringing.
+                {% elif (ringing_alarm_count | int) > 0 %}
+                  Alarm ringing.
+                {% else %}
+                  Timer ringing.
+                {% endif %}
+          - service: assist_satellite.announce
+            target:
+              entity_id:
+                - assist_satellite.bedroom_va_a_assist_satellite
+                - assist_satellite.orangepi_a_assist_satellite
+            data:
+              message: "{{ announce_message }}"
+
+          - repeat:
+              while:
+                - condition: template
+                  value_template: "{{ (ringing_alarm_count | int) > 0 or (ringing_timer_count | int) > 0 }}"
+              sequence:
+                - wait_for_trigger:
+                    - platform: mqtt
+                      topic: snoozefest_dev/state/ringing_alarm_count
+                    - platform: mqtt
+                      topic: snoozefest_dev/state/ringing_timer_count
+                  timeout: "00:00:30"
+                  continue_on_timeout: true
+
+                - service: mqtt.publish
+                  data:
+                    topic: snoozefest_dev/cmd/state/request
+                    payload: "{}"
+
+                - wait_for_trigger:
+                    - platform: mqtt
+                      topic: snoozefest_dev/state/ringing_alarm_count
+                  timeout: "00:00:01"
+                  continue_on_timeout: true
+
+                - variables:
+                    ringing_alarm_count: >-
+                      {% if wait.trigger is not none %}
+                        {{ wait.trigger.payload | int(0) }}
+                      {% else %}
+                        0
+                      {% endif %}
+
+                - wait_for_trigger:
+                    - platform: mqtt
+                      topic: snoozefest_dev/state/ringing_timer_count
+                  timeout: "00:00:01"
+                  continue_on_timeout: true
+
+                - variables:
+                    ringing_timer_count: >-
+                      {% if wait.trigger is not none %}
+                        {{ wait.trigger.payload | int(0) }}
+                      {% else %}
+                        0
+                      {% endif %}

@@ -1,15 +1,53 @@
 {
-  "oneoffs": [],
+  "oneoffs": [
+    {
+      "id": "1",
+      "time": "2026-03-28T17:00:00+00:00",
+      "label": "VA Alarm: 1800",
+      "enabled": true,
+      "temporary": true
+    },
+    {
+      "id": "2",
+      "time": "2026-03-28T18:00:00+00:00",
+      "label": "VA Alarm: 1900",
+      "enabled": true,
+      "temporary": true
+    },
+    {
+      "id": "3",
+      "time": "2026-03-28T15:40:00+00:00",
+      "label": "VA Alarm: 1640",
+      "enabled": true,
+      "temporary": true
+    }
+  ],
   "recurring": [],
   "timers": [
     {
       "id": "1",
-      "label": "New Timer",
-      "duration_seconds": 300,
-      "started_at": "2026-03-28T11:18:19.556163+00:00",
-      "expires_at": "2026-03-28T11:18:19.556163+00:00",
-      "status": "dismissed"
+      "label": "VA Timer: 2",
+      "duration_seconds": 120,
+      "started_at": "2026-03-28T15:36:48.218438+00:00",
+      "expires_at": "2026-03-28T15:38:48.218438+00:00",
+      "status": "ringing",
+      "temporary": true
+    },
+    {
+      "id": "2",
+      "label": "VA Timer: 10",
+      "duration_seconds": 600,
+      "started_at": "2026-03-28T15:37:15.418331+00:00",
+      "expires_at": "2026-03-28T15:47:15.418331+00:00",
+      "status": "ringing",
+      "temporary": true
     }
   ],
-  "active_alarms": []
+  "active_alarms": [
+    {
+      "alarm_id": "3",
+      "triggered_at": "2026-03-28T15:40:00.495742+00:00",
+      "snoozed_until": null
+    }
+  ]
 }

@@ -99,6 +99,7 @@ class Store:
             time=datetime.fromisoformat(d["time"]),
             label=d["label"],
             enabled=d.get("enabled", True),
+            temporary=d.get("temporary", False),
         )
 
     @staticmethod
@@ -109,6 +110,7 @@ class Store:
             weekdays=d["weekdays"],
             label=d["label"],
             enabled=d.get("enabled", True),
+            temporary=d.get("temporary", False),
             last_triggered_date=d.get("last_triggered_date"),
         )
 
@@ -121,6 +123,7 @@ class Store:
             started_at=datetime.fromisoformat(d["started_at"]),
             expires_at=datetime.fromisoformat(d["expires_at"]),
             status=d.get("status", "running"),
+            temporary=d.get("temporary", False),
         )
 
     @staticmethod
@@ -155,7 +158,13 @@ class Store:
 
     @staticmethod
     def _encode_oneoff(o: AlarmOneOff) -> dict:
-        return {"id": o.id, "time": o.time.isoformat(), "label": o.label, "enabled": o.enabled}
+        return {
+            "id": o.id,
+            "time": o.time.isoformat(),
+            "label": o.label,
+            "enabled": o.enabled,
+            "temporary": o.temporary,
+        }
 
     @staticmethod
     def _encode_recurring(r: AlarmRecurring) -> dict:
@@ -165,6 +174,7 @@ class Store:
             "weekdays": r.weekdays,
             "label": r.label,
             "enabled": r.enabled,
+            "temporary": r.temporary,
             "last_triggered_date": r.last_triggered_date,
         }
 
@@ -177,6 +187,7 @@ class Store:
             "started_at": t.started_at.isoformat(),
             "expires_at": t.expires_at.isoformat(),
             "status": t.status,
+            "temporary": t.temporary,
         }
 
     @staticmethod
