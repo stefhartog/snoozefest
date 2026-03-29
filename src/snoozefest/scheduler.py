@@ -25,6 +25,7 @@ class Scheduler:
         self,
         store: Store,
         tz: ZoneInfo,
+        alarm_trigger_grace_seconds: int,
         on_alarm_triggered: Callable[[str, str], None],
         on_timer_finished: Callable[[str, str], None],
         on_state_changed: Callable[[], None],
@@ -34,6 +35,7 @@ class Scheduler:
         self._on_alarm_triggered = on_alarm_triggered
         self._on_timer_finished = on_timer_finished
         self._on_state_changed = on_state_changed
+        self._alarm_trigger_grace_seconds = max(0, int(alarm_trigger_grace_seconds))
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ time
@@ -123,9 +125,15 @@ class Scheduler:
                     if alarm.last_triggered_date == today_local:
                         continue
 
-                # Alarms fire only during their scheduled minute to avoid
-                # immediate catch-up triggers after daemon restarts.
-                if now_local.hour == hour and now_local.minute == minute:
+                # Alarms fire during their scheduled minute, optionally
+                # extended by a post-minute grace window.
+                scheduled_local = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+                # Base window is HH:MM:00..HH:MM:59. Grace extends beyond that.
+                trigger_deadline = scheduled_local + timedelta(seconds=59 + self._alarm_trigger_grace_seconds)
+                should_trigger = scheduled_local <= now_local <= trigger_deadline
+
+                if should_trigger:
                     alarm.status = "ringing"
                     alarm.triggered_at = now_utc
                     alarm.snoozed_until = None
@@ -393,13 +401,13 @@ class Scheduler:
         """
         Dismiss alarm(s).
 
-        Active alarm behavior:
+        Ringing/snoozed behavior:
         - Recurring alarm: marks current day as handled and stays enabled.
         - Non-recurring alarm: disables after dismiss to mimic one-off behavior.
 
-        Idle behavior:
-        - If alarm_id is provided and no active alarm matches, dismiss that alarm by ID.
-        - If alarm_id is omitted and no active alarms exist, dismiss the next scheduled alarm.
+        Fallback behavior when no ringing/snoozed alarm is matched:
+        - If alarm_id is provided, dismiss that alarm by ID.
+        - If alarm_id is omitted, dismiss the next scheduled alarm.
         """
         dismissed: List[str] = []
         with self._lock:
@@ -440,6 +448,12 @@ class Scheduler:
                             continue
                         if alarm.temporary:
                             state.alarms.remove(alarm)
+                        elif alarm.recurring:
+                            alarm.status = "active"
+                            alarm.enabled = True
+                            alarm.last_triggered_date = today
+                            alarm.triggered_at = None
+                            alarm.snoozed_until = None
                         else:
                             alarm.status = "inactive"
                             alarm.enabled = False
@@ -729,7 +743,7 @@ class Scheduler:
             return ("inactive", "Inactive", "disabled")
 
         if alarm.recurring and alarm.last_triggered_date == today_local_iso:
-            return ("inactive", "Inactive", "dismissed_for_today")
+            return ("active", "Active", "dismissed_for_today")
 
         return ("active", "Active", "scheduled")
 

@@ -9,5 +9,6 @@
   "timezone": "Europe/Stockholm",
   "data_file": "snoozefest_data.json",
   "tick_seconds": 1,
-  "default_snooze_minutes": 10
+  "default_snooze_minutes": 10,
+  "alarm_trigger_grace_seconds": 120
 }

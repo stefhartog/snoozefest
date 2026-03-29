@@ -36,6 +36,7 @@ class Daemon:
         self._scheduler = Scheduler(
             store=self._store,
             tz=self._tz,
+            alarm_trigger_grace_seconds=config.alarm_trigger_grace_seconds,
             on_alarm_triggered=self._on_alarm_triggered,
             on_timer_finished=self._on_timer_finished,
             on_state_changed=self._publish_all_state,
@@ -412,6 +413,9 @@ class Daemon:
     def _alarm_time_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_time"
 
+    def _alarm_time_picker_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_time_picker"
+
     def _alarm_time_set_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_time_set_display"
 
@@ -520,6 +524,12 @@ class Daemon:
             f"{self._alarm_time_object_id(alarm_id)}/config"
         )
 
+    def _alarm_time_discovery_topic_time_picker(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/time/"
+            f"{self._alarm_time_picker_object_id(alarm_id)}/config"
+        )
+
     def _alarm_time_set_discovery_topic(self, alarm_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
@@ -532,7 +542,7 @@ class Daemon:
             f"{self._alarm_status_text_object_id(alarm_id)}/config"
         )
 
-    def _alarm_time_discovery_topic_legacy(self, alarm_id: str) -> str:
+    def _alarm_time_discovery_topic_legacy_time(self, alarm_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/time/"
             f"{self._alarm_time_object_id(alarm_id)}/config"
@@ -1113,9 +1123,9 @@ class Daemon:
                 "payload_not_available": "false",
                 "state_topic": self._alarm_time_state_topic(alarm_id),
                 "command_topic": self._alarm_time_command_topic(alarm_id),
-                "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)(:([0-5]\\d))?$",
-                "mode": "text",
                 "icon": "mdi:clock-time-four-outline",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$",
+                "mode": "text",
                 "device": self._alarm_device(alarm, alarm_id),
             }
             weekday_switch_payloads = []
@@ -1146,7 +1156,8 @@ class Daemon:
             self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), recurring_payload, retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), label_payload, retain=True)
-            self._mqtt.publish(self._alarm_time_discovery_topic_legacy(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_discovery_topic_legacy_time(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_discovery_topic_time_picker(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic(alarm_id), time_payload, retain=True)
             self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_text(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_status_text_discovery_topic_legacy_text(alarm_id), "", retain=True)
@@ -1191,8 +1202,9 @@ class Daemon:
             self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_discovery_topic_legacy_time(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_time_discovery_topic_time_picker(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic(alarm_id), "", retain=True)
-            self._mqtt.publish(self._alarm_time_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_text(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_status_text_discovery_topic_legacy_text(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_set_discovery_topic_legacy_sensor(alarm_id), "", retain=True)
@@ -1865,6 +1877,16 @@ class Daemon:
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
+    def _publish_alarm_runtime_state(self, state: dict) -> None:
+        alarms: list[dict] = state.get("alarms", [])
+        for alarm in alarms:
+            alarm_id = str(alarm.get("id"))
+            self._mqtt.publish(
+                self._alarm_remaining_state_topic(alarm_id),
+                self._alarm_eta_state(alarm),
+                retain=True,
+            )
+
     def _cmd_timer_update(self, payload: dict) -> None:
         timer_id = str(payload["id"])
         updates: dict[str, object] = {}
@@ -1966,6 +1988,9 @@ class Daemon:
             loop_state = self._scheduler.full_state()
             self._mqtt.publish_state("ringing_alarm_count", self._ringing_alarm_count(loop_state))
             self._mqtt.publish_state("ringing_timer_count", self._ringing_timer_count(loop_state))
+
+            if self._store.state.alarms:
+                self._publish_alarm_runtime_state(loop_state)
 
             if self._store.state.timers:
                 self._publish_timer_runtime_state(loop_state)

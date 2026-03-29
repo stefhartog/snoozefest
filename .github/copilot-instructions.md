@@ -41,6 +41,9 @@ This project is a local-first scheduler with Home Assistant MQTT discovery.
 - Keep README aligned with actual command topics and behavior.
 - Remove references to deleted legacy dashboard/script files.
 - Mention entity-first management as the default path.
+- Keep voice automation docs/scripts aligned with current MQTT topic-prefix variable usage.
+- Document `command_result.request_id` as optional when request correlation is implemented.
+- Keep add-on docs aligned with Dockerfile source behavior (GitHub clone at build, cache-bust rules, and commit SHA visibility in logs).
 
 ## Validation Before Finish
 

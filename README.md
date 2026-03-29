@@ -78,6 +78,7 @@ Prefix comes from `mqtt_topic_prefix` in config (default: `snoozefest`).
 - <prefix>/cmd/timer/cancel
 - <prefix>/cmd/timer/remove
 - <prefix>/cmd/timer/snooze
+- <prefix>/cmd/timer/activate
 - <prefix>/cmd/timer/dismiss
 - <prefix>/cmd/state/request
 
@@ -95,10 +96,13 @@ Per-entity set topics are also used by HA discovery entities, for example:
 - <prefix>/state/online (retained true/false)
 - <prefix>/state/alarms (retained JSON list)
 - <prefix>/state/timers (retained JSON list)
-- <prefix>/state/active_alarm (retained JSON)
+- <prefix>/state/alarms_glance (retained summary string)
+- <prefix>/state/timers_glance (retained summary string)
+- <prefix>/state/active_alarm (deprecated, published empty for cleanup)
 - <prefix>/state/next_alarm (retained JSON or null)
+- <prefix>/state/ringing_alarm_count (retained integer)
 - <prefix>/state/ringing_timer_count (retained integer)
-- <prefix>/state/command_result (event, not retained)
+- <prefix>/state/command_result (event, not retained; includes optional request_id)
 - <prefix>/state/error (event, not retained)
 - <prefix>/state/heartbeat (event, not retained)
 - <prefix>/state/alarm_triggered (event, not retained)
@@ -111,10 +115,11 @@ Per-entity set topics are also used by HA discovery entities, for example:
   - weekdays empty means one-off
   - weekdays non-empty means recurring
 - New alarms are created disabled by default.
-- New timers are created in dismissed state by default.
+- New timers are created inactive by default.
 - Purge All removes only Snoozefest alarms/timers from scheduler state.
 - Timer discovery payloads are not republished every tick; runtime state updates are.
-- Recurring alarms do not catch up missed triggers after downtime.
+- Ringing alarms and timers auto-dismiss after 5 minutes.
+- Recurring alarms do not catch up missed triggers after downtime by default.
 - IDs are compact numeric strings with max 25 alarms and 25 timers.
 
 ## Config
@@ -134,6 +139,7 @@ Use `config.example.json` as a template.
 | data_file | snoozefest_data.json | Persistent JSON state path |
 | tick_seconds | 1 | Scheduler loop interval |
 | default_snooze_minutes | 10 | Default alarm snooze minutes |
+| alarm_trigger_grace_seconds | 120 | Optional extra seconds added after the scheduled minute window (`HH:MM:00..HH:MM:59`); `0` keeps minute-only triggering |
 
 ## CLI helpers
 
