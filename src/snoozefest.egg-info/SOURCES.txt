@@ -5,6 +5,7 @@ src/snoozefest/__main__.py
 src/snoozefest/cli.py
 src/snoozefest/config.py
 src/snoozefest/daemon.py
+src/snoozefest/humanize.py
 src/snoozefest/models.py
 src/snoozefest/mqtt_client.py
 src/snoozefest/scheduler.py

@@ -18,6 +18,7 @@ class Config:
     data_file: str
     tick_seconds: int
     default_snooze_minutes: int
+    timer_add_seconds: int
     alarm_trigger_grace_seconds: int
 
     @classmethod
@@ -36,5 +37,6 @@ class Config:
             data_file=data.get("data_file", "snoozefest_data.json"),
             tick_seconds=int(data.get("tick_seconds", 1)),
             default_snooze_minutes=int(data.get("default_snooze_minutes", 10)),
+            timer_add_seconds=max(1, int(data.get("timer_add_seconds") or 60)),
             alarm_trigger_grace_seconds=max(0, int(data.get("alarm_trigger_grace_seconds", 120))),
         )

@@ -10,5 +10,6 @@
   "data_file": "snoozefest_data.json",
   "tick_seconds": 1,
   "default_snooze_minutes": 10,
+  "timer_add_seconds": 60,
   "alarm_trigger_grace_seconds": 120
 }

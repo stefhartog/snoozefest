@@ -52,3 +52,31 @@ This project is a local-first scheduler with Home Assistant MQTT discovery.
 - Restart daemon and confirm logs show:
   - Snoozefest daemon running
   - MQTT connected
+
+## Codebase Notes
+
+### humanize.py
+- `duration_to_speech(total_seconds)` — renders "2 hours 30 minutes", "45 seconds", "now", or "" for None/disabled
+- `remaining_to_day_phrase(total_seconds, now=None)` — returns "today", "tomorrow", or weekday name (e.g. "Tuesday")
+  - Pass `now=datetime.now(self._tz)` in the daemon for timezone-aware results
+
+### Alarm and timer sensor naming convention
+Alarm per-device sensors use a numbered-prefix naming scheme (controls ordering in HA):
+- `07a` Status — entity suffix `_status`
+- `07b` Remaining Friendly — entity suffix `_remaining_friendly`, uses `duration_to_speech`
+- `07c` Next Day — entity suffix `_next_day`, uses `remaining_to_day_phrase`
+
+Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
+
+### Dashboard cards (root YAML files)
+- `ha_dashboard_alarms_auto_list_card.yaml` — flex-table-card listing all alarms
+- `ha_dashboard_timers_auto_list_card.yaml` — flex-table-card listing all timers
+  (has a commented-out `snoozefest_dev` include line as a manual dev/prod toggle pattern)
+- `ha_dashboard_alarm_detail_popup_card.yaml` — single alarm detail popup card
+  - Uses `custom:config-template-card`; `vars[0]` holds the alarm ID string
+  - All entity IDs are hard-coded to the `snoozefest_*` prefix
+  - **KNOWN BROKEN**: Using `vars[1]` as an MQTT prefix variable breaks this card when
+    invoked from a popup wrapper (browser_mod etc.). Do not retry this approach.
+  - **OPEN TASK**: Implement a working dev/prod MQTT prefix switch for this card.
+    Preferred alternatives: comment-based toggle (like the timer list card) or reading
+    from a `input_text.snoozefest_env` HA entity at runtime.

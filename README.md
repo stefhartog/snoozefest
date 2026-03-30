@@ -77,9 +77,11 @@ Prefix comes from `mqtt_topic_prefix` in config (default: `snoozefest`).
 - <prefix>/cmd/timer/update
 - <prefix>/cmd/timer/cancel
 - <prefix>/cmd/timer/remove
+- <prefix>/cmd/timer/add_time
 - <prefix>/cmd/timer/snooze
 - <prefix>/cmd/timer/activate
 - <prefix>/cmd/timer/dismiss
+- <prefix>/cmd/settings/timer_add_seconds/set
 - <prefix>/cmd/state/request
 
 Per-entity set topics are also used by HA discovery entities, for example:
@@ -139,6 +141,7 @@ Use `config.example.json` as a template.
 | data_file | snoozefest_data.json | Persistent JSON state path |
 | tick_seconds | 1 | Scheduler loop interval |
 | default_snooze_minutes | 10 | Default alarm snooze minutes |
+| timer_add_seconds | 60 | Default seconds added by timer Add Time action |
 | alarm_trigger_grace_seconds | 120 | Optional extra seconds added after the scheduled minute window (`HH:MM:00..HH:MM:59`); `0` keeps minute-only triggering |
 
 ## CLI helpers
@@ -168,8 +171,29 @@ src/snoozefest/
   cli.py
   config.py
   daemon.py
+  humanize.py
   models.py
   mqtt_client.py
   scheduler.py
   store.py
 ```
+
+## Alarm sensors per device
+
+Each alarm device publishes the following sensors (prefix controls ordering in HA):
+
+| Sensor | Entity suffix | Description |
+|---|---|---|
+| `07a` Status | `_status` | Current alarm state (idle, ringing, snoozed, etc.) |
+| `07b` Remaining Friendly | `_remaining_friendly` | Human-readable time remaining (e.g. "2 hours 30 minutes") |
+| `07c` Next Day | `_next_day` | Day the alarm fires: "today", "tomorrow", or weekday name |
+
+## Dashboard cards
+
+Three ready-to-use HA dashboard YAML files are included in the project root:
+
+| File | Purpose |
+|---|---|
+| `ha_dashboard_alarms_auto_list_card.yaml` | Auto-list of all alarm entities |
+| `ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities (has a commented dev/prod prefix toggle) |
+| `ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |

@@ -9,6 +9,8 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from .config import Config
+from .humanize import duration_to_speech
+from .humanize import remaining_to_day_phrase
 from .mqtt_client import MQTTClient
 from .scheduler import Scheduler
 from .store import Store
@@ -45,6 +47,7 @@ class Daemon:
         self._mqtt = MQTTClient(config=config, on_command=self._handle_command)
         self._running = False
         self._active_request_id: Optional[str] = None
+        self._timer_add_seconds = max(1, int(config.timer_add_seconds))
 
     def _timestamp_payload(self, dt: datetime) -> dict:
         utc_dt = dt.astimezone(timezone.utc)
@@ -203,6 +206,23 @@ class Daemon:
             "icon": "mdi:format-list-bulleted",
             "device": self._root_device(),
         }
+        timer_add_seconds_payload = {
+            "name": "Timer Add Time Seconds",
+            "unique_id": self._manager_timer_add_seconds_object_id(),
+            "object_id": self._manager_timer_add_seconds_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": self._manager_timer_add_seconds_state_topic(),
+            "command_topic": self._manager_timer_add_seconds_command_topic(),
+            "icon": "mdi:timer-plus-outline",
+            "min": 1,
+            "max": 3600,
+            "step": 1,
+            "mode": "box",
+            "unit_of_measurement": "s",
+            "device": self._root_device(),
+        }
         self._mqtt.publish(self._manager_add_alarm_discovery_topic(), add_alarm_payload, retain=True)
         self._mqtt.publish(self._manager_add_timer_discovery_topic(), add_timer_payload, retain=True)
         self._mqtt.publish(self._manager_purge_all_discovery_topic(), purge_all_payload, retain=True)
@@ -211,6 +231,8 @@ class Daemon:
         self._mqtt.publish(self._manager_ringing_timer_count_discovery_topic(), ringing_timer_count_payload, retain=True)
         self._mqtt.publish(self._manager_alarms_glance_discovery_topic(), alarms_glance_payload, retain=True)
         self._mqtt.publish(self._manager_timers_glance_discovery_topic(), timers_glance_payload, retain=True)
+        self._mqtt.publish(self._manager_timer_add_seconds_discovery_topic(), timer_add_seconds_payload, retain=True)
+        self._mqtt.publish(self._manager_timer_add_seconds_state_topic(), str(self._timer_add_seconds), retain=True)
 
     @staticmethod
     def _ringing_alarm_count(state: dict) -> int:
@@ -347,6 +369,21 @@ class Daemon:
             f"{self._manager_timers_glance_object_id()}/config"
         )
 
+    def _manager_timer_add_seconds_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_timer_add_seconds"
+
+    def _manager_timer_add_seconds_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/number/"
+            f"{self._manager_timer_add_seconds_object_id()}/config"
+        )
+
+    def _manager_timer_add_seconds_state_topic(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/settings/timer_add_seconds"
+
+    def _manager_timer_add_seconds_command_topic(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}/cmd/settings/timer_add_seconds/set"
+
     def _alarm_device_identifier(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_device"
 
@@ -395,6 +432,12 @@ class Daemon:
 
     def _alarm_remaining_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_remaining"
+
+    def _alarm_remaining_friendly_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_remaining_friendly"
+
+    def _alarm_next_day_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_next_day"
 
     def _alarm_eta_object_id(self, alarm_id: str) -> str:
         # Backward-compatible alias retained for transitional references.
@@ -488,6 +531,18 @@ class Daemon:
             f"{self._alarm_remaining_object_id(alarm_id)}/config"
         )
 
+    def _alarm_remaining_friendly_discovery_topic(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_remaining_friendly_object_id(alarm_id)}/config"
+        )
+
+    def _alarm_next_day_discovery_topic(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_next_day_object_id(alarm_id)}/config"
+        )
+
     def _alarm_eta_discovery_topic_legacy(self, alarm_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
@@ -575,6 +630,12 @@ class Daemon:
     def _alarm_remaining_state_topic(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/remaining"
 
+    def _alarm_remaining_friendly_state_topic(self, alarm_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/remaining_friendly"
+
+    def _alarm_next_day_state_topic(self, alarm_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/next_day"
+
     def _alarm_eta_state_topic_legacy(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/eta"
 
@@ -659,6 +720,10 @@ class Daemon:
         remaining = int(timer.get("remaining", timer.get("remaining_seconds", 0)))
         return self._seconds_to_ddhhmmss(remaining)
 
+    def _timer_remaining_friendly_entity_value(self, timer: dict) -> str:
+        remaining = int(timer.get("remaining", timer.get("remaining_seconds", 0)))
+        return duration_to_speech(remaining)
+
     @staticmethod
     def _normalized_alarm_status_fallback(alarm: dict, status: str) -> str:
         status = str(status).strip().lower()
@@ -695,6 +760,9 @@ class Daemon:
     def _timer_duration_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_duration"
 
+    def _timer_temporary_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_temporary"
+
     def _timer_time_set_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_time_set_display"
 
@@ -725,7 +793,10 @@ class Daemon:
             f"{self._timer_object_id(timer_id)}_status_text/config"
         )
 
-    def _timer_snooze_object_id(self, timer_id: str) -> str:
+    def _timer_add_time_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_add_time"
+
+    def _timer_snooze_object_id_legacy(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_snooze"
 
     def _timer_activate_object_id(self, timer_id: str) -> str:
@@ -739,6 +810,9 @@ class Daemon:
 
     def _timer_remaining_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_remaining"
+
+    def _timer_remaining_friendly_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_remaining_friendly"
 
     def _timer_status_discovery_topic(self, timer_id: str) -> str:
         return (
@@ -756,6 +830,12 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/text/"
             f"{self._timer_duration_object_id(timer_id)}/config"
+        )
+
+    def _timer_temporary_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/switch/"
+            f"{self._timer_temporary_object_id(timer_id)}/config"
         )
 
     def _timer_time_set_discovery_topic(self, timer_id: str) -> str:
@@ -782,16 +862,28 @@ class Daemon:
             f"{self._timer_remaining_object_id(timer_id)}/config"
         )
 
+    def _timer_remaining_friendly_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._timer_remaining_friendly_object_id(timer_id)}/config"
+        )
+
     def _timer_remove_discovery_topic(self, timer_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
             f"{self._timer_remove_object_id(timer_id)}/config"
         )
 
-    def _timer_snooze_discovery_topic(self, timer_id: str) -> str:
+    def _timer_add_time_discovery_topic(self, timer_id: str) -> str:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
-            f"{self._timer_snooze_object_id(timer_id)}/config"
+            f"{self._timer_add_time_object_id(timer_id)}/config"
+        )
+
+    def _timer_snooze_discovery_topic_legacy(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._timer_snooze_object_id_legacy(timer_id)}/config"
         )
 
     def _timer_activate_discovery_topic(self, timer_id: str) -> str:
@@ -821,8 +913,17 @@ class Daemon:
     def _timer_duration_command_topic(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/cmd/timer/{timer_id}/duration/set"
 
+    def _timer_temporary_state_topic(self, timer_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/temporary"
+
+    def _timer_temporary_command_topic(self, timer_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/cmd/timer/{timer_id}/temporary/set"
+
     def _timer_remaining_state_topic(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/remaining"
+
+    def _timer_remaining_friendly_state_topic(self, timer_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/remaining_friendly"
 
     def _timer_remaining_state_topic_legacy(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/remaining_seconds"
@@ -877,6 +978,22 @@ class Daemon:
                 "mode": "text",
                 "device": self._timer_device(timer, timer_id),
             }
+            temporary_payload = {
+                "name": "03 Temporary",
+                "unique_id": self._timer_temporary_object_id(timer_id),
+                "object_id": self._timer_temporary_object_id(timer_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "state_topic": self._timer_temporary_state_topic(timer_id),
+                "command_topic": self._timer_temporary_command_topic(timer_id),
+                "payload_on": "ON",
+                "payload_off": "OFF",
+                "state_on": "ON",
+                "state_off": "OFF",
+                "icon": "mdi:content-save-outline",
+                "device": self._timer_device(timer, timer_id),
+            }
             status_payload = {
                 "name": "08 Status",
                 "unique_id": self._timer_status_object_id(timer_id),
@@ -900,6 +1017,17 @@ class Daemon:
                 "icon": "mdi:timer-sand",
                 "device": self._timer_device(timer, timer_id),
             }
+            remaining_friendly_payload = {
+                "name": "09b Remaining Friendly",
+                "unique_id": self._timer_remaining_friendly_object_id(timer_id),
+                "object_id": self._timer_remaining_friendly_object_id(timer_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "state_topic": self._timer_remaining_friendly_state_topic(timer_id),
+                "icon": "mdi:account-voice",
+                "device": self._timer_device(timer, timer_id),
+            }
             remove_payload = {
                 "name": "11 Remove",
                 "unique_id": self._timer_remove_object_id(timer_id),
@@ -912,16 +1040,16 @@ class Daemon:
                 "icon": "mdi:delete",
                 "device": self._timer_device(timer, timer_id),
             }
-            snooze_payload = {
-                "name": "10 Snooze",
-                "unique_id": self._timer_snooze_object_id(timer_id),
-                "object_id": self._timer_snooze_object_id(timer_id),
+            add_time_payload = {
+                "name": "10 Add Time",
+                "unique_id": self._timer_add_time_object_id(timer_id),
+                "object_id": self._timer_add_time_object_id(timer_id),
                 "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
                 "payload_available": "true",
                 "payload_not_available": "false",
-                "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/snooze",
+                "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/add_time",
                 "payload_press": f'{{"id":"{timer_id}"}}',
-                "icon": "mdi:alarm-snooze",
+                "icon": "mdi:timer-plus",
                 "device": self._timer_device(timer, timer_id),
             }
             activate_payload = {
@@ -952,6 +1080,7 @@ class Daemon:
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), label_payload, retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), duration_payload, retain=True)
+            self._mqtt.publish(self._timer_temporary_discovery_topic(timer_id), temporary_payload, retain=True)
             self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_text(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_text_discovery_topic_legacy_text(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_sensor(timer_id), "", retain=True)
@@ -960,18 +1089,22 @@ class Daemon:
             self._mqtt.publish(self._timer_status_discovery_topic(timer_id), status_payload, retain=True)
             self._mqtt.publish(self._timer_status_text_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), remaining_payload, retain=True)
+            self._mqtt.publish(self._timer_remaining_friendly_discovery_topic(timer_id), remaining_friendly_payload, retain=True)
             self._mqtt.publish(self._timer_remove_discovery_topic(timer_id), remove_payload, retain=True)
-            self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), snooze_payload, retain=True)
+            self._mqtt.publish(self._timer_snooze_discovery_topic_legacy(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_add_time_discovery_topic(timer_id), add_time_payload, retain=True)
             self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), activate_payload, retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), dismiss_payload, retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
+            self._mqtt.publish(self._timer_temporary_state_topic(timer_id), "ON" if bool(timer.get("temporary", False)) else "OFF", retain=True)
             self._mqtt.publish(
                 self._timer_status_state_topic(timer_id),
                 str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "inactive")))),
                 retain=True,
             )
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
+            self._mqtt.publish(self._timer_remaining_friendly_state_topic(timer_id), self._timer_remaining_friendly_entity_value(timer), retain=True)
             self._mqtt.publish(self._timer_remaining_state_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
@@ -980,6 +1113,7 @@ class Daemon:
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_temporary_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_text(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_text_discovery_topic_legacy_text(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_time_set_discovery_topic_legacy_sensor(timer_id), "", retain=True)
@@ -988,14 +1122,18 @@ class Daemon:
             self._mqtt.publish(self._timer_status_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_text_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_remaining_friendly_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remove_discovery_topic(timer_id), "", retain=True)
-            self._mqtt.publish(self._timer_snooze_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_snooze_discovery_topic_legacy(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_add_time_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_temporary_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_status_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_remaining_friendly_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_remaining_state_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), "", retain=True)
 
@@ -1086,6 +1224,28 @@ class Daemon:
                 "icon": "mdi:timer-sand",
                 "device": self._alarm_device(alarm, alarm_id),
             }
+            remaining_friendly_payload = {
+                "name": "07b Remaining Friendly",
+                "unique_id": self._alarm_remaining_friendly_object_id(alarm_id),
+                "object_id": self._alarm_remaining_friendly_object_id(alarm_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "state_topic": self._alarm_remaining_friendly_state_topic(alarm_id),
+                "icon": "mdi:account-voice",
+                "device": self._alarm_device(alarm, alarm_id),
+            }
+            next_day_payload = {
+                "name": "07c Next Day",
+                "unique_id": self._alarm_next_day_object_id(alarm_id),
+                "object_id": self._alarm_next_day_object_id(alarm_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "state_topic": self._alarm_next_day_state_topic(alarm_id),
+                "icon": "mdi:calendar-today",
+                "device": self._alarm_device(alarm, alarm_id),
+            }
             recurring_payload = {
                 "name": "05 Recurring",
                 "unique_id": self._alarm_recurring_object_id(alarm_id),
@@ -1153,6 +1313,8 @@ class Daemon:
             self._mqtt.publish(self._alarm_status_discovery_topic(alarm_id), status_payload, retain=True)
             self._mqtt.publish(self._alarm_eta_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_remaining_discovery_topic(alarm_id), remaining_payload, retain=True)
+            self._mqtt.publish(self._alarm_remaining_friendly_discovery_topic(alarm_id), remaining_friendly_payload, retain=True)
+            self._mqtt.publish(self._alarm_next_day_discovery_topic(alarm_id), next_day_payload, retain=True)
             self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), recurring_payload, retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), label_payload, retain=True)
@@ -1187,6 +1349,16 @@ class Daemon:
                 self._alarm_eta_state(alarm),
                 retain=True,
             )
+            self._mqtt.publish(
+                self._alarm_remaining_friendly_state_topic(alarm_id),
+                self._alarm_eta_friendly_state(alarm),
+                retain=True,
+            )
+            self._mqtt.publish(
+                self._alarm_next_day_state_topic(alarm_id),
+                self._alarm_next_day_state(alarm),
+                retain=True,
+            )
             self._mqtt.publish(self._alarm_eta_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_attributes_topic(alarm_id), alarm, retain=True)
 
@@ -1199,6 +1371,8 @@ class Daemon:
             self._mqtt.publish(self._alarm_status_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_eta_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_remaining_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_remaining_friendly_discovery_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_next_day_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), "", retain=True)
@@ -1224,31 +1398,56 @@ class Daemon:
             for wd in range(7):
                 self._mqtt.publish(self._alarm_weekday_state_topic(alarm_id, wd), "", retain=True)
             self._mqtt.publish(self._alarm_remaining_state_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_remaining_friendly_state_topic(alarm_id), "", retain=True)
+            self._mqtt.publish(self._alarm_next_day_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_eta_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_attributes_topic(alarm_id), "", retain=True)
 
         self._published_alarm_entities = current_ids
 
-    def _alarm_eta_state(self, alarm: dict) -> str:
+    def _alarm_remaining_seconds(self, alarm: dict) -> Optional[int]:
         status = str(alarm.get("status", "inactive")).strip().lower()
-        if status in {"ringing", "snoozed"}:
-            return "00:00:00:00"
+        if status == "ringing":
+            return 0
+        if status == "snoozed":
+            raw_snoozed_until = alarm.get("snoozed_until")
+            if not raw_snoozed_until:
+                return 0
+            try:
+                snoozed_until = datetime.fromisoformat(str(raw_snoozed_until).replace("Z", "+00:00"))
+                if snoozed_until.tzinfo is None:
+                    snoozed_until = snoozed_until.replace(tzinfo=timezone.utc)
+                now_utc = datetime.now(timezone.utc)
+                remaining_seconds = int((snoozed_until.astimezone(timezone.utc) - now_utc).total_seconds())
+                return max(0, remaining_seconds)
+            except (TypeError, ValueError):
+                return 0
         if not alarm.get("enabled", True):
-            return ""
+            return None
 
         next_trigger = self._next_alarm_trigger_utc(alarm)
         if next_trigger is None:
-            return ""
+            return None
 
         now_utc = datetime.now(timezone.utc)
         remaining_seconds = int((next_trigger - now_utc).total_seconds())
-        if remaining_seconds <= 0:
-            return "00:00:00:00"
+        return max(0, remaining_seconds)
+
+    def _alarm_eta_state(self, alarm: dict) -> str:
+        remaining_seconds = self._alarm_remaining_seconds(alarm)
+        if remaining_seconds is None:
+            return ""
 
         days, rem_seconds = divmod(remaining_seconds, 24 * 3600)
         hours, rem_seconds = divmod(rem_seconds, 3600)
         minutes, seconds = divmod(rem_seconds, 60)
         return f"{days:02d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    def _alarm_eta_friendly_state(self, alarm: dict) -> str:
+        return duration_to_speech(self._alarm_remaining_seconds(alarm))
+
+    def _alarm_next_day_state(self, alarm: dict) -> str:
+        return remaining_to_day_phrase(self._alarm_remaining_seconds(alarm), now=datetime.now(self._tz))
 
     def _next_alarm_trigger_utc(self, alarm: dict) -> Optional[datetime]:
         now_utc = datetime.now(timezone.utc)
@@ -1480,6 +1679,8 @@ class Daemon:
                 return
             if self._try_handle_timer_setting_command(cmd, payload):
                 return
+            if self._try_handle_manager_setting_command(cmd, payload):
+                return
 
             handler = {
                 "purge_all":      self._cmd_purge_all,
@@ -1495,6 +1696,7 @@ class Daemon:
                 "timer/cancel":   self._cmd_timer_cancel,
                 "timer/remove":   self._cmd_timer_remove,
                 "timer/snooze":   self._cmd_timer_snooze,
+                "timer/add_time": self._cmd_timer_add_time,
                 "timer/activate": self._cmd_timer_activate,
                 "timer/dismiss":  self._cmd_timer_dismiss,
                 "state/request":  self._cmd_state_request,
@@ -1702,7 +1904,49 @@ class Daemon:
                 self._ack(cmd, False, f"Timer not found: {timer_id}")
             return True
 
+        if field == "temporary":
+            if isinstance(payload, bool):
+                temporary = payload
+            elif isinstance(payload, str):
+                normalized = payload.strip().upper()
+                if normalized in {"ON", "TRUE", "1"}:
+                    temporary = True
+                elif normalized in {"OFF", "FALSE", "0"}:
+                    temporary = False
+                else:
+                    raise ValueError(f"Unsupported temporary payload: {payload!r}")
+            else:
+                raise TypeError("Timer temporary payload must be ON/OFF or boolean")
+
+            if self._scheduler.update_timer(timer_id, temporary=temporary):
+                self._ack(cmd, True, f"Timer temporary updated: {timer_id}")
+            else:
+                self._ack(cmd, False, f"Timer not found: {timer_id}")
+            return True
+
         return False
+
+    def _try_handle_manager_setting_command(self, cmd: str, payload: object) -> bool:
+        if cmd != "settings/timer_add_seconds/set":
+            return False
+
+        if isinstance(payload, (int, float)):
+            seconds = int(payload)
+        elif isinstance(payload, str):
+            raw = payload.strip()
+            if raw == "":
+                raise ValueError("timer_add_seconds must not be empty")
+            seconds = int(raw)
+        else:
+            raise TypeError("timer_add_seconds payload must be numeric")
+
+        if seconds < 1:
+            raise ValueError("timer_add_seconds must be >= 1")
+
+        self._timer_add_seconds = seconds
+        self._mqtt.publish(self._manager_timer_add_seconds_state_topic(), str(self._timer_add_seconds), retain=True)
+        self._ack(cmd, True, f"Timer add-time updated: {self._timer_add_seconds}s")
+        return True
 
     def _ack(self, cmd: str, success: bool, message: str = "") -> None:
         payload = {"command": cmd, "success": success, "message": message}
@@ -1728,7 +1972,7 @@ class Daemon:
     def _cmd_alarm_new(self, payload: dict) -> None:
         """Create a new alarm. Payload can include:
         - time: "HH:MM" string (default: now+1min)
-        - label: string (default: "New Alarm")
+        - label: string (default: "")
         - enabled: bool (default: true when payload is non-empty, else false)
         - temporary: bool (default: false)
         - recurring: bool (default: false)
@@ -1738,7 +1982,7 @@ class Daemon:
         default_time = (now_local + timedelta(minutes=1)).replace(second=0, microsecond=0).strftime("%H:%M")
 
         time_str = payload.get("time", default_time)
-        label = payload.get("label", "New Alarm")
+        label = payload.get("label", "")
         enabled = bool(payload.get("enabled", bool(payload)))
         temporary = bool(payload.get("temporary", False))
         recurring = bool(payload.get("recurring", False))
@@ -1840,13 +2084,13 @@ class Daemon:
         - duration_seconds: int (default: 300)
         - label: string (default: "New Timer")
         - active: bool (default: true when payload is non-empty, else false)
-        - temporary: bool (default: false)
+        - temporary: bool (default: true)
         """
         duration = self._parse_duration_seconds(payload, default_seconds=300)
         
         label = payload.get("label", "New Timer")
         is_active = bool(payload.get("active", payload.get("running", bool(payload))))
-        temporary = bool(payload.get("temporary", False))
+        temporary = bool(payload.get("temporary", True))
         initial_status = "active" if is_active else "inactive"
         timer = self._scheduler.add_timer(
             duration,
@@ -1854,14 +2098,16 @@ class Daemon:
             initial_status=initial_status,
             temporary=temporary,
         )
-        self._ack("timer/new", True, f"Timer created {initial_status}: {timer.id}")
+        temp_suffix = " temporary" if temporary else ""
+        self._ack("timer/new", True, f"Timer created {initial_status}{temp_suffix}: {timer.id}")
 
     def _cmd_timer_set(self, payload: dict) -> None:
         duration = self._parse_duration_seconds(payload, default_seconds=300)
         label = str(payload.get("label", "Timer"))
-        temporary = bool(payload.get("temporary", False))
+        temporary = bool(payload.get("temporary", True))
         timer = self._scheduler.add_timer(duration, label, initial_status="inactive", temporary=temporary)
-        self._ack("timer/set", True, f"Timer created inactive: {timer.id}")
+        temp_suffix = " temporary" if temporary else ""
+        self._ack("timer/set", True, f"Timer created inactive{temp_suffix}: {timer.id}")
 
     def _publish_timer_runtime_state(self, state: dict) -> None:
         timers: list[dict] = state.get("timers", [])
@@ -1869,12 +2115,14 @@ class Daemon:
             timer_id = str(timer.get("id"))
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
+            self._mqtt.publish(self._timer_temporary_state_topic(timer_id), "ON" if bool(timer.get("temporary", False)) else "OFF", retain=True)
             self._mqtt.publish(
                 self._timer_status_state_topic(timer_id),
                 str(timer.get("status_normalized") or self._normalized_timer_status_fallback(str(timer.get("status", "inactive")))),
                 retain=True,
             )
             self._mqtt.publish(self._timer_remaining_state_topic(timer_id), self._timer_remaining_entity_value(timer), retain=True)
+            self._mqtt.publish(self._timer_remaining_friendly_state_topic(timer_id), self._timer_remaining_friendly_entity_value(timer), retain=True)
             self._mqtt.publish(self._timer_attributes_topic(timer_id), timer, retain=True)
 
     def _publish_alarm_runtime_state(self, state: dict) -> None:
@@ -1886,6 +2134,16 @@ class Daemon:
                 self._alarm_eta_state(alarm),
                 retain=True,
             )
+            self._mqtt.publish(
+                self._alarm_remaining_friendly_state_topic(alarm_id),
+                self._alarm_eta_friendly_state(alarm),
+                retain=True,
+            )
+            self._mqtt.publish(
+                self._alarm_next_day_state_topic(alarm_id),
+                self._alarm_next_day_state(alarm),
+                retain=True,
+            )
 
     def _cmd_timer_update(self, payload: dict) -> None:
         timer_id = str(payload["id"])
@@ -1894,6 +2152,8 @@ class Daemon:
             updates["duration_seconds"] = int(payload["duration_seconds"])
         if "label" in payload:
             updates["label"] = str(payload["label"])
+        if "temporary" in payload:
+            updates["temporary"] = bool(payload["temporary"])
         if not updates:
             raise ValueError("No timer update fields provided")
         if self._scheduler.update_timer(timer_id, **updates):
@@ -1915,19 +2175,22 @@ class Daemon:
         else:
             self._ack("timer/remove", False, f"Timer not found: {timer_id}")
 
-    def _cmd_timer_snooze(self, payload: dict) -> None:
+    def _cmd_timer_add_time(self, payload: dict, ack_command: str = "timer/add_time") -> None:
         timer_id_raw = payload.get("id")
         timer_id = str(timer_id_raw) if timer_id_raw is not None else None
-        if self._scheduler.snooze_timer(timer_id, seconds=60):
+        if self._scheduler.add_time_timer(timer_id, seconds=self._timer_add_seconds):
             if timer_id is None:
-                self._ack("timer/snooze", True, "Snoozed ringing timer(s)")
+                self._ack(ack_command, True, "Added time to timer(s)")
             else:
-                self._ack("timer/snooze", True, f"Timer snoozed: {timer_id}")
+                self._ack(ack_command, True, f"Added {self._timer_add_seconds}s: {timer_id}")
         else:
             if timer_id is None:
-                self._ack("timer/snooze", False, "No ringing timers to snooze")
+                self._ack(ack_command, False, "No active or ringing timers to add time")
             else:
-                self._ack("timer/snooze", False, f"Timer is not ringing: {timer_id}")
+                self._ack(ack_command, False, f"Timer is not active or ringing: {timer_id}")
+
+    def _cmd_timer_snooze(self, payload: dict) -> None:
+        self._cmd_timer_add_time(payload, ack_command="timer/snooze")
 
     def _cmd_timer_activate(self, payload: dict) -> None:
         timer_id_raw = payload.get("id")

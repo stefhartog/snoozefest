@@ -1,0 +1,293 @@
+visibility:
+  - condition: state
+    entity: input_text.snoozefest_timer_id
+    state: ""
+type: vertical-stack
+cards:
+  - type: heading
+    heading: Timers
+  - type: custom:auto-entities
+    card:
+      type: vertical-stack
+    card_param: cards
+    filter:
+      include:
+        - entity_id: /^sensor\.[a-z0-9_]+_timer_\d+_remaining_friendly$/
+          options:
+            type: custom:button-card
+            entity: this.entity_id
+            triggers_update: all
+            show_icon: false
+            show_name: true
+            show_label: true
+            show_state: false
+            name: |
+              [[[ 
+                const eid = entity?.entity_id || '';
+                if (!eid) return '--';
+                const base = eid.replace(/^sensor\./, '').replace(/_remaining_friendly$/, '');
+                const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
+                const sourceEntityId = status === 'inactive'
+                  ? 'text.' + base + '_duration'
+                  : 'sensor.' + base + '_remaining';
+                const raw = String(states[sourceEntityId]?.state || '--:--').trim();
+                let dd = 0, hh = 0, mm = 0, ss = 0;
+                if (/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(raw)) {
+                  [dd, hh, mm, ss] = raw.split(':').map((n) => Number(n));
+                } else if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) {
+                  [hh, mm, ss] = raw.split(':').map((n) => Number(n));
+                } else if (/^\d{2}:\d{2}$/.test(raw)) {
+                  [mm, ss] = raw.split(':').map((n) => Number(n));
+                } else {
+                  return raw;
+                }
+
+                const parts = [];
+                if (dd > 0) parts.push(`${dd}d`);
+                if (hh > 0 || dd > 0) parts.push(`${hh}h`);
+                if (mm > 0 || hh > 0 || dd > 0) parts.push(`${mm}m`);
+                parts.push(`${ss}s`);
+                return parts.join(' ');
+              ]]]
+            label: |
+              [[[ 
+                const eid = entity?.entity_id || '';
+                if (!eid) return '--';
+                const base = eid.replace(/^sensor\./, '').replace(/_remaining_friendly$/, '');
+                const raw = String(states['text.' + base + '_duration']?.state || '--:--').trim();
+                let dd = 0, hh = 0, mm = 0, ss = 0;
+                if (/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(raw)) {
+                  [dd, hh, mm, ss] = raw.split(':').map((n) => Number(n));
+                } else if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) {
+                  [hh, mm, ss] = raw.split(':').map((n) => Number(n));
+                } else if (/^\d{2}:\d{2}$/.test(raw)) {
+                  [mm, ss] = raw.split(':').map((n) => Number(n));
+                } else {
+                  return raw;
+                }
+
+                const parts = [];
+                if (dd > 0) parts.push(`${dd}d`);
+                if (hh > 0 || dd > 0) parts.push(`${hh}h`);
+                if (mm > 0 || hh > 0 || dd > 0) parts.push(`${mm}m`);
+                parts.push(`${ss}s`);
+                return parts.join(' ');
+              ]]]
+            color_type: card
+            styles:
+              card:
+                - padding: 16px 18px
+                - padding-bottom: 20px
+                - background: |
+                    [[[ 
+                      const eid = entity?.entity_id || '';
+                      if (!eid) {
+                        return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
+                      }
+                      const base = eid.replace(/^sensor\./, '').replace(/_remaining_friendly$/, '');
+                      const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
+                      if (status === 'ringing') return 'rgba(220, 53, 69, 0.18)';
+                      if (status === 'snoozed') return 'rgba(255, 193, 7, 0.18)';
+                      if (status === 'active') return 'rgba(40, 167, 69, 0.18)';
+                      return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
+                    ]]]
+                - box-shadow: none
+                - min-height: 84px
+              grid:
+                - grid-template-areas: '"l" "n"'
+                - grid-template-columns: 1fr
+                - grid-template-rows: min-content min-content
+                - row-gap: 8px
+              label:
+                - justify-self: start
+                - align-self: end
+                - text-align: left
+                - font-size: 0.8rem
+                - color: var(--secondary-text-color)
+                - padding: 0
+              name:
+                - justify-self: start
+                - align-self: start
+                - text-align: left
+                - font-size: 2.1rem
+                - line-height: 1
+                - font-weight: 600
+                - padding: 0
+            tap_action:
+              action: javascript
+              javascript: |
+                [[[ 
+                  (async () => {
+                    const hass = this._hass;
+                    const eid = entity?.entity_id || '';
+                    if (!eid) return;
+                    const base = eid.replace(/^sensor\./, '').replace(/_remaining_friendly$/, '');
+                    const idMatch = base.match(/_timer_(\d+)$/);
+                    if (!idMatch) return;
+                    await hass.callService('input_text', 'set_value', {
+                      entity_id: 'input_text.snoozefest_timer_id',
+                      value: String(idMatch[1]),
+                    });
+                  })();
+                ]]]
+            hold_action:
+              action: javascript
+              javascript: |
+                [[[ 
+                  (async () => {
+                    const hass = this._hass;
+                    const eid = entity?.entity_id || '';
+                    if (!eid) return;
+                    const base = eid.replace(/^sensor\./, '').replace(/_remaining_friendly$/, '');
+                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
+                    const actionSuffix = status === 'inactive' ? 'activate' : 'dismiss';
+                    await hass.callService('button', 'press', {
+                      entity_id: `button.${base}_${actionSuffix}`,
+                    });
+                  })();
+                ]]]
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:button-card
+        color_type: blank-card
+      - type: custom:button-card
+        color_type: blank-card
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        show_label: true
+        triggers_update: all
+        update_timer: 2
+        name: |
+          [[[ 
+            const rawEnv = states['input_text.snoozefest_env']?.state;
+            const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+              ? rawEnv
+              : 'snoozefest';
+            const usedIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+              .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+              .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+            return usedIds.length >= 12 ? 'Max' : '+';
+          ]]]
+        label: |
+          [[[ 
+            const rawEnv = states['input_text.snoozefest_env']?.state;
+            const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+              ? rawEnv
+              : 'snoozefest';
+            const usedIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+              .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+              .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+            return usedIds.length >= 12 ? 'Maximum timers reached (12)' : '';
+          ]]]
+        color_type: card
+        styles:
+          card:
+            - min-height: 80px
+            - background: |
+                [[[ 
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : 'snoozefest';
+                  const usedIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12
+                    ? 'color-mix(in srgb, var(--disabled-text-color) 20%, transparent)'
+                    : 'color-mix(in srgb, var(--primary-color) 14%, transparent)';
+                ]]]
+            - opacity: |
+                [[[ 
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : 'snoozefest';
+                  const usedIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12 ? '0.65' : '1';
+                ]]]
+          name:
+            - color: |
+                [[[ 
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : 'snoozefest';
+                  const usedIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12 ? 'var(--disabled-text-color)' : 'var(--primary-color)';
+                ]]]
+            - font-size: |
+                [[[ 
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : 'snoozefest';
+                  const usedIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12 ? '1.4rem' : '3rem';
+                ]]]
+            - line-height: 1
+            - font-weight: 600
+          label:
+            - color: var(--secondary-text-color)
+            - font-size: 0.8rem
+            - padding-top: 6px
+        tap_action:
+          action: javascript
+          javascript: |
+            [[[ 
+              (async () => {
+                const hass = this._hass;
+                const rawEnv = hass.states['input_text.snoozefest_env']?.state;
+                const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                  ? rawEnv
+                  : 'snoozefest';
+
+                const usedIds = Object.keys(hass.states)
+                  .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
+                  .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                  .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+
+                if (usedIds.length >= 12) {
+                  helpers.toastMessage('Maximum timers reached (12)');
+                  return;
+                }
+
+                let nextId = null;
+                for (let i = 1; i <= 12; i += 1) {
+                  if (!usedIds.includes(i)) {
+                    nextId = i;
+                    break;
+                  }
+                }
+
+                if (!nextId) {
+                  helpers.toastMessage('No free timer ID available');
+                  return;
+                }
+
+                await hass.callService('button', 'press', {
+                  entity_id: `button.${env}_manager_add_timer`,
+                });
+
+                await new Promise((resolve) => setTimeout(resolve, 250));
+
+                await hass.callService('input_text', 'set_value', {
+                  entity_id: 'input_text.snoozefest_timer_id',
+                  value: String(nextId),
+                });
+              })();
+            ]]]

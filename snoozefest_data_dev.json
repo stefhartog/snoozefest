@@ -2,38 +2,15 @@
   "alarms": [
     {
       "id": "1",
-      "time": "01:28",
+      "time": "12:12",
       "weekdays": [
         0,
         1,
         2,
         3,
-        4,
-        5,
-        6
+        4
       ],
-      "label": "Weekdays",
-      "enabled": true,
-      "temporary": false,
-      "recurring": true,
-      "last_triggered_date": "2026-03-29",
-      "status": "active",
-      "triggered_at": null,
-      "snoozed_until": null
-    },
-    {
-      "id": "2",
-      "time": "01:35",
-      "weekdays": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
-      ],
-      "label": "New Alarm",
+      "label": "",
       "enabled": true,
       "temporary": false,
       "recurring": false,
@@ -41,7 +18,75 @@
       "status": "active",
       "triggered_at": null,
       "snoozed_until": null
+    },
+    {
+      "id": "2",
+      "time": "00:06",
+      "weekdays": [
+        5,
+        6
+      ],
+      "label": "Weekend",
+      "enabled": false,
+      "temporary": false,
+      "recurring": true,
+      "last_triggered_date": null,
+      "status": "inactive",
+      "triggered_at": null,
+      "snoozed_until": null
+    },
+    {
+      "id": "3",
+      "time": "23:19",
+      "weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "label": "",
+      "enabled": false,
+      "temporary": false,
+      "recurring": false,
+      "last_triggered_date": null,
+      "status": "inactive",
+      "triggered_at": null,
+      "snoozed_until": null
+    },
+    {
+      "id": "4",
+      "time": "13:32",
+      "weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "label": "",
+      "enabled": false,
+      "temporary": false,
+      "recurring": false,
+      "last_triggered_date": null,
+      "status": "inactive",
+      "triggered_at": null,
+      "snoozed_until": null
     }
   ],
-  "timers": []
+  "timers": [
+    {
+      "id": "1",
+      "label": "VA Timer: 10 seconds",
+      "duration_seconds": 4,
+      "started_at": "2026-03-30T17:44:10.689182+00:00",
+      "expires_at": "2026-03-30T17:44:17.621755+00:00",
+      "status": "inactive",
+      "temporary": false
+    }
+  ]
 }

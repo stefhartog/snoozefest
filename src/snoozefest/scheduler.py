@@ -520,6 +520,7 @@ class Scheduler:
         *,
         duration_seconds: Optional[int] = None,
         label: Optional[str] = None,
+        temporary: Optional[bool] = None,
     ) -> bool:
         with self._lock:
             now_utc = self._now_utc()
@@ -529,6 +530,9 @@ class Scheduler:
 
                 if label is not None:
                     timer.label = str(label)
+
+                if temporary is not None:
+                    timer.temporary = bool(temporary)
 
                 if duration_seconds is not None:
                     if duration_seconds < 1:
@@ -551,17 +555,21 @@ class Scheduler:
             self._on_state_changed()
         return found
 
-    def snooze_timer(self, timer_id: Optional[str] = None, seconds: int = 60) -> bool:
+    def add_time_timer(self, timer_id: Optional[str] = None, seconds: int = 60) -> bool:
+        """Add time to a timer (active or ringing). Both states extend the countdown clock."""
         with self._lock:
             now_utc = self._now_utc()
             changed = False
             for timer in self._store.state.timers:
-                if (timer_id is None or timer.id == timer_id) and timer.status == "ringing":
-                    timer.expires_at = now_utc + timedelta(seconds=seconds)
-                    timer.status = "snoozed"
-                    changed = True
-                    if timer_id is not None:
-                        break
+                if timer_id is None or timer.id == timer_id:
+                    if timer.status in ("ringing", "active"):
+                        # Add time to the clock; if ringing, transition to active and keep counting down
+                        timer.expires_at = timer.expires_at + timedelta(seconds=seconds)
+                        if timer.status == "ringing":
+                            timer.status = "active"
+                        changed = True
+                        if timer_id is not None:
+                            break
 
             if changed:
                 self._store.save()
@@ -569,6 +577,10 @@ class Scheduler:
         if changed:
             self._on_state_changed()
         return changed
+
+    def snooze_timer(self, timer_id: Optional[str] = None, seconds: int = 60) -> bool:
+        """Backward-compatible alias for add-time timer behavior."""
+        return self.add_time_timer(timer_id=timer_id, seconds=seconds)
 
     def dismiss_timer(self, timer_id: Optional[str] = None) -> bool:
         with self._lock:

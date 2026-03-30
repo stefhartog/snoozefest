@@ -78,8 +78,10 @@ class MQTTClient:
             "timer/cancel",
             "timer/remove",
             "timer/snooze",
+            "timer/add_time",
             "timer/activate",
             "timer/dismiss",
+            "settings/timer_add_seconds/set",
             "state/request",
         ):
             client.subscribe(f"{self._prefix}/cmd/{suffix}")
@@ -91,6 +93,7 @@ class MQTTClient:
         client.subscribe(f"{self._prefix}/cmd/alarm/+/weekday/+/set")
         client.subscribe(f"{self._prefix}/cmd/timer/+/label/set")
         client.subscribe(f"{self._prefix}/cmd/timer/+/duration/set")
+        client.subscribe(f"{self._prefix}/cmd/timer/+/temporary/set")
 
         self.publish(f"{self._prefix}/state/online", "true", retain=True)
 
