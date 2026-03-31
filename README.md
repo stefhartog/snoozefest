@@ -197,8 +197,8 @@ Three ready-to-use HA dashboard YAML files are included in the project root:
 
 | File | Purpose |
 |---|---|
-| `ha_dashboard_alarms_auto_list_card.yaml` | Auto-list of all alarm entities |
-| `ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities (has a commented dev/prod prefix toggle) |
+| `ha_dashboard_alarms_simple_auto_list_card.yaml` | Auto-list of all alarm entities |
+| `ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities rendered with `custom:snoozefest-time-picker-card` rows |
 | `ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
 | `ha_dashboard_timer_detail_popup_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
 

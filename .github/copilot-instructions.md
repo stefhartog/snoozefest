@@ -70,9 +70,8 @@ Alarm per-device sensors use a numbered-prefix naming scheme (controls ordering 
 Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
 
 ### Dashboard cards (root YAML files)
-- `ha_dashboard_alarms_auto_list_card.yaml` — flex-table-card listing all alarms
-- `ha_dashboard_timers_auto_list_card.yaml` — flex-table-card listing all timers
-  (has a commented-out `snoozefest_dev` include line as a manual dev/prod toggle pattern)
+- `ha_dashboard_alarms_simple_auto_list_card.yaml` — auto-entities list of all alarms
+- `ha_dashboard_timers_auto_list_card.yaml` — auto-entities list of all timers using `custom:snoozefest-time-picker-card` rows
 - `ha_dashboard_alarm_detail_popup_card.yaml` — single alarm detail popup card
   - Uses `custom:config-template-card`; `vars[0]` holds the alarm ID string
   - All entity IDs are hard-coded to the `snoozefest_*` prefix
