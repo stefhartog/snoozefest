@@ -151,7 +151,7 @@ class Scheduler:
 
             # Expired timers
             for timer in state.timers:
-                if timer.status in {"active", "snoozed"} and now_utc >= timer.expires_at:
+                if timer.status == "active" and now_utc >= timer.expires_at:
                     timer.status = "ringing"
                     state_changed = True
                     finished.append((timer.id, timer.label))
@@ -477,8 +477,8 @@ class Scheduler:
         initial_status: str = "active",
         temporary: bool = False,
     ) -> Timer:
-        if duration_seconds < 1:
-            raise ValueError("duration_seconds must be ≥ 1")
+        if duration_seconds < 0:
+            raise ValueError("duration_seconds must be ≥ 0")
         if initial_status not in {"active", "inactive"}:
             raise ValueError("initial_status must be 'active' or 'inactive'")
 
@@ -523,7 +523,6 @@ class Scheduler:
         temporary: Optional[bool] = None,
     ) -> bool:
         with self._lock:
-            now_utc = self._now_utc()
             for timer in self._store.state.timers:
                 if timer.id != timer_id:
                     continue
@@ -537,14 +536,10 @@ class Scheduler:
                 if duration_seconds is not None:
                     if duration_seconds < 1:
                         raise ValueError("duration_seconds must be ≥ 1")
+                    # Editing set-time should not restart currently running timers.
                     timer.duration_seconds = duration_seconds
-                    if timer.status == "inactive":
-                        timer.started_at = now_utc
-                        timer.expires_at = now_utc
-                    else:
-                        timer.started_at = now_utc
-                        timer.expires_at = now_utc + timedelta(seconds=duration_seconds)
-                        timer.status = "active"
+                    if timer.status == "paused":
+                        timer.paused_remaining_seconds = duration_seconds
 
                 self._store.save()
                 found = True
@@ -556,9 +551,8 @@ class Scheduler:
         return found
 
     def add_time_timer(self, timer_id: Optional[str] = None, seconds: int = 60) -> bool:
-        """Add time to a timer (active or ringing). Both states extend the countdown clock."""
+        """Add time to a timer. Running timers extend the clock; paused timers keep the added time paused."""
         with self._lock:
-            now_utc = self._now_utc()
             changed = False
             for timer in self._store.state.timers:
                 if timer_id is None or timer.id == timer_id:
@@ -567,6 +561,12 @@ class Scheduler:
                         timer.expires_at = timer.expires_at + timedelta(seconds=seconds)
                         if timer.status == "ringing":
                             timer.status = "active"
+                        timer.paused_remaining_seconds = None
+                        changed = True
+                        if timer_id is not None:
+                            break
+                    elif timer.status == "paused":
+                        timer.paused_remaining_seconds = max(0, int(timer.paused_remaining_seconds or 0)) + seconds
                         changed = True
                         if timer_id is not None:
                             break
@@ -590,12 +590,13 @@ class Scheduler:
                 if timer_id is not None and timer.id != timer_id:
                     continue
 
-                if timer.status in {"active", "ringing", "snoozed"}:
+                if timer.status in {"active", "ringing", "paused"}:
                     if timer.temporary:
                         self._store.state.timers.remove(timer)
                     else:
                         timer.status = "inactive"
                         timer.expires_at = now_utc
+                        timer.paused_remaining_seconds = None
                     changed = True
                     if timer_id is not None:
                         break
@@ -616,13 +617,66 @@ class Scheduler:
                 if timer_id is not None and timer.id != timer_id:
                     continue
 
-                if timer.status == "inactive":
+                if timer.status in {"inactive", "active", "ringing", "paused"}:
                     timer.started_at = now_utc
                     timer.expires_at = now_utc + timedelta(seconds=timer.duration_seconds)
                     timer.status = "active"
+                    timer.paused_remaining_seconds = None
                     changed = True
                     if timer_id is not None:
                         break
+
+            if changed:
+                self._store.save()
+
+        if changed:
+            self._on_state_changed()
+        return changed
+
+    def pause_timer(self, timer_id: Optional[str] = None) -> bool:
+        with self._lock:
+            now_utc = self._now_utc()
+            changed = False
+            for timer in self._store.state.timers:
+                if timer_id is not None and timer.id != timer_id:
+                    continue
+
+                if timer.status != "active":
+                    continue
+
+                remaining_seconds = max(0, int((timer.expires_at - now_utc).total_seconds()))
+                timer.status = "paused"
+                timer.paused_remaining_seconds = remaining_seconds
+                changed = True
+                if timer_id is not None:
+                    break
+
+            if changed:
+                self._store.save()
+
+        if changed:
+            self._on_state_changed()
+        return changed
+
+    def resume_timer(self, timer_id: Optional[str] = None) -> bool:
+        with self._lock:
+            now_utc = self._now_utc()
+            changed = False
+            for timer in self._store.state.timers:
+                if timer_id is not None and timer.id != timer_id:
+                    continue
+
+                if timer.status != "paused":
+                    continue
+
+                remaining_seconds = max(1, int(timer.paused_remaining_seconds or 0))
+                timer.started_at = now_utc
+                timer.expires_at = now_utc + timedelta(seconds=remaining_seconds)
+                timer.status = "active"
+                timer.paused_remaining_seconds = None
+                changed = True
+                if timer_id is not None:
+                    break
 
             if changed:
                 self._store.save()
@@ -729,10 +783,10 @@ class Scheduler:
         timer_status = str(status).strip().lower()
         if timer_status == "ringing":
             return ("ringing", "Ringing", "ringing")
-        if timer_status == "snoozed":
-            return ("snoozed", "Snoozed", "snoozed")
         if timer_status == "active":
             return ("active", "Active", "active")
+        if timer_status == "paused":
+            return ("paused", "Paused", "paused")
         if timer_status == "inactive":
             return ("inactive", "Inactive", "inactive")
         return ("inactive", "Inactive", "unknown")
@@ -792,7 +846,10 @@ class Scheduler:
         payload: list[dict] = []
         for t in state.timers:
             canonical_status, normalized_status, status_reason = self._normalize_timer_status(str(t.status))
-            remaining_seconds = max(0, int((t.expires_at - now_utc).total_seconds()))
+            if canonical_status == "paused":
+                remaining_seconds = max(0, int(t.paused_remaining_seconds or 0))
+            else:
+                remaining_seconds = max(0, int((t.expires_at - now_utc).total_seconds()))
             expires_payload = self._dt_payload(t.expires_at)
             payload.append({
                 "id": t.id,
@@ -809,6 +866,7 @@ class Scheduler:
                 "expires_at_utc": expires_payload["utc"],
                 "expires_at_local": expires_payload["local"],
                 "expires_at_friendly": expires_payload["friendly_local"],
+                "paused_remaining_seconds": t.paused_remaining_seconds,
                 "timezone": str(self._tz),
             })
         return payload

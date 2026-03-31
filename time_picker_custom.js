@@ -1,7 +1,7 @@
 ((LitElement) => {
 	const html = LitElement.prototype.html;
 	const css = LitElement.prototype.css;
-	const version = '0.3.4-custom';
+const version = '0.3.8-custom';
 
 	class SnoozefestTimePickerCard extends LitElement {
 		constructor() {
@@ -9,10 +9,15 @@
 			this._onKeydown = this._onKeydown.bind(this);
 			this._onCommit = this._onCommit.bind(this);
 			this._onStepperPointerDown = this._onStepperPointerDown.bind(this);
+			this._onCardPointerDown = this._onCardPointerDown.bind(this);
+			this._onCardPointerUp = this._onCardPointerUp.bind(this);
+			this._onCardPointerCancel = this._onCardPointerCancel.bind(this);
 			this._pendingValue = null;
 			this._pendingPrevValue = null;
 			this._pendingSince = 0;
 			this._pendingUntil = 0;
+			this._holdTimer = null;
+			this._holdFired = false;
 		}
 
 		static get properties() {
@@ -64,6 +69,13 @@
 					line-height: inherit;
 					padding: 0;
 					margin: 0;
+				}
+				.input[readonly] {
+					user-select: none;
+					-webkit-user-select: none;
+					caret-color: transparent;
+					cursor: default;
+					pointer-events: none;
 				}
 				.stepper-btn {
 					position: absolute;
@@ -125,17 +137,37 @@
 		}
 
 		setConfig(config) {
-			if (!config || !config.entity) {
-				throw new Error('Please define an entity for this card.');
+			if (!config || (!config.entity && !config.display_entity)) {
+				throw new Error('Please define entity or display_entity for this card.');
 			}
-			const domain = String(config.entity).split('.')[0];
-			if (domain !== 'text' && domain !== 'input_text') {
-				throw new Error('Entity must be text or input_text.');
+			const writeEntity = config.entity ? String(config.entity) : null;
+			const displayEntity = config.display_entity ? String(config.display_entity) : writeEntity;
+
+			if (!displayEntity) {
+				throw new Error('A display entity could not be resolved.');
 			}
+
+			const writeDomain = writeEntity ? writeEntity.split('.')[0] : null;
+			const displayDomain = displayEntity.split('.')[0];
+
+			if (writeEntity && writeDomain !== 'text' && writeDomain !== 'input_text') {
+				throw new Error('entity must be text or input_text.');
+			}
+			if (displayDomain !== 'text' && displayDomain !== 'input_text' && displayDomain !== 'sensor') {
+				throw new Error('display_entity must be text, input_text, or sensor.');
+			}
+
+			const readOnly = config.read_only === true;
 			this.config = {
-				entity: config.entity,
+				entity: writeEntity,
+				display_entity: displayEntity,
+				status_entity: config.status_entity != null ? String(config.status_entity) : null,
+				status_color_target: config.status_color_target != null ? String(config.status_color_target).toLowerCase() : 'input',
+				tap_sets_timer_id: config.tap_sets_timer_id != null ? String(config.tap_sets_timer_id) : null,
+				hold_dismisses: config.hold_dismisses === true,
+				read_only: readOnly,
 				title: config.title,
-				autosave: config.autosave !== false,
+				autosave: readOnly ? false : (config.autosave !== false),
 				content_justify: this._normalizeFlexPosition(config.content_justify || config.justify || 'left', 'horizontal'),
 				content_align: this._normalizeFlexPosition(config.content_align || config.align || 'center', 'vertical'),
 				show_days: config.show_days === true,
@@ -167,6 +199,11 @@
 				pending_write_ms: config.pending_write_ms != null ? parseInt(config.pending_write_ms, 10) : 700,
 				pending_stale_ms: config.pending_stale_ms != null ? parseInt(config.pending_stale_ms, 10) : 3000,
 				input_background: config.input_background != null ? String(config.input_background) : null,
+				status_color_default: config.status_color_default != null ? String(config.status_color_default) : null,
+				status_color_inactive: config.status_color_inactive != null ? String(config.status_color_inactive) : null,
+				status_color_active: config.status_color_active != null ? String(config.status_color_active) : null,
+				status_color_paused: config.status_color_paused != null ? String(config.status_color_paused) : null,
+				status_color_ringing: config.status_color_ringing != null ? String(config.status_color_ringing) : null,
 				input_padding: config.input_padding != null ? String(config.input_padding) : null,
 				input_border_radius: config.input_border_radius != null ? String(config.input_border_radius) : null,
 				card_border: config.card_border !== undefined ? config.card_border : null,
@@ -189,11 +226,153 @@
 			if (!hass || !this.config) {
 				return;
 			}
-			this.stateObj = hass.states[this.config.entity] || null;
+			let resolvedDisplayEntity = this.config.display_entity;
+			if (this.config.read_only && /^sensor\..+_timer_\d+_remaining$/.test(resolvedDisplayEntity || '')) {
+				const statusEntity = resolvedDisplayEntity.replace(/_remaining$/, '_status');
+				const durationEntity = resolvedDisplayEntity.replace(/^sensor\./, 'text.').replace(/_remaining$/, '_duration');
+				const status = String(hass.states[statusEntity]?.state || '').toLowerCase();
+				if (status === 'inactive' && hass.states[durationEntity]) {
+					resolvedDisplayEntity = durationEntity;
+				}
+			}
+			this.stateObj = hass.states[resolvedDisplayEntity] || null;
 			if (!this.stateObj) {
 				return;
 			}
 			this._syncFromState();
+		}
+
+		_deriveTimerBase() {
+			const d = String(this.config?.display_entity || '');
+			const m = d.match(/^sensor\.(.+_timer_\d+)_remaining(?:_friendly)?$/) ||
+			          d.match(/^(?:text|input_text)\.(.+_timer_\d+)_duration$/);
+			return m ? m[1] : null;
+		}
+
+		_deriveTimerId() {
+			const base = this._deriveTimerBase();
+			if (!base) return null;
+			const m = base.match(/_timer_(\d+)$/);
+			return m ? m[1] : null;
+		}
+
+		_onCardPointerDown(ev) {
+			if (!this.config.tap_sets_timer_id && !this.config.hold_dismisses) return;
+			if (ev.target && ev.target.closest('input, button')) return;
+			this._holdFired = false;
+			this._holdTimer = setTimeout(() => {
+				this._holdFired = true;
+				this._doHold();
+			}, 500);
+		}
+
+		_onCardPointerUp(ev) {
+			if (!this.config.tap_sets_timer_id && !this.config.hold_dismisses) return;
+			clearTimeout(this._holdTimer);
+			this._holdTimer = null;
+			if (this._holdFired) return;
+			if (ev.target && ev.target.closest('input, button')) return;
+			this._doTap();
+		}
+
+		_onCardPointerCancel() {
+			clearTimeout(this._holdTimer);
+			this._holdTimer = null;
+		}
+
+		_doTap() {
+			if (!this._hass || !this.config.tap_sets_timer_id) return;
+			const id = this._deriveTimerId();
+			if (!id) return;
+			this._hass.callService('input_text', 'set_value', {
+				entity_id: this.config.tap_sets_timer_id,
+				value: id,
+			});
+		}
+
+		_doHold() {
+			if (!this._hass || !this.config.hold_dismisses) return;
+			const base = this._deriveTimerBase();
+			if (!base) return;
+			this._hass.callService('button', 'press', {
+				entity_id: 'button.' + base + '_dismiss',
+			});
+		}
+
+		_getCurrentStatus() {
+			if (!this._hass || !this.config) {
+				return '';
+			}
+			const statusEntity = this._getDerivedStatusEntity();
+			return String(this._hass.states[statusEntity]?.state || '').toLowerCase();
+		}
+
+		_isStatusColorTargetEnabled(target) {
+			const mode = String(this.config?.status_color_target || 'input').toLowerCase();
+			if (mode === 'both') {
+				return true;
+			}
+			return mode === target;
+		}
+
+		_getStatusColor(status) {
+			if (!status) {
+				return this.config.status_color_default ?? null;
+			}
+			const key = `status_color_${status}`;
+			return this.config[key] ?? this.config.status_color_default ?? null;
+		}
+
+		_getDerivedStatusEntity() {
+			if (!this.config) {
+				return null;
+			}
+			if (this.config.status_entity) {
+				return this.config.status_entity;
+			}
+
+			const displayEntity = String(this.config.display_entity || '');
+			if (!displayEntity) {
+				return null;
+			}
+
+			if (/^sensor\..+_timer_\d+_remaining$/.test(displayEntity)) {
+				return displayEntity.replace(/_remaining$/, '_status');
+			}
+			if (/^sensor\..+_timer_\d+_remaining_friendly$/.test(displayEntity)) {
+				return displayEntity.replace(/_remaining_friendly$/, '_status');
+			}
+			if (/^(text|input_text)\..+_timer_\d+_duration$/.test(displayEntity)) {
+				return displayEntity.replace(/^(text|input_text)\./, 'sensor.').replace(/_duration$/, '_status');
+			}
+
+			return null;
+		}
+
+		_getResolvedInputBackground(status) {
+			if (!this._hass || !this.config) {
+				return this.config?.input_background ?? null;
+			}
+			if (this._isStatusColorTargetEnabled('input')) {
+				const statusColor = this._getStatusColor(status);
+				if (statusColor != null) {
+					return statusColor;
+				}
+			}
+			return this.config.input_background;
+		}
+
+		_getResolvedCardBackground(status) {
+			if (!this._hass || !this.config) {
+				return this.config?.card_background ?? null;
+			}
+			if (this._isStatusColorTargetEnabled('card')) {
+				const statusColor = this._getStatusColor(status);
+				if (statusColor != null) {
+					return statusColor;
+				}
+			}
+			return this.config.card_background;
 		}
 
 		_normalizeFlexPosition(value, axis) {
@@ -246,14 +425,19 @@
 				return html`
 					<ha-card .hass="${this._hass}" .config="${this.config}">
 						<div class="wrapper">
-							<span class="missing-entity">Missing entity: ${this.config?.entity || ''}</span>
+							<span class="missing-entity">Missing entity: ${this.config?.display_entity || this.config?.entity || ''}</span>
 						</div>
 					</ha-card>
 				`;
 			}
 
+			const interactive = !this.config.read_only;
+			const currentStatus = this._getCurrentStatus();
+			const resolvedInputBackground = this._getResolvedInputBackground(currentStatus);
+			const resolvedCardBackground = this._getResolvedCardBackground(currentStatus);
+
 			const cardStyle = [
-				this.config.card_background != null ? `--ha-card-background: ${this.config.card_background}` : '',
+				resolvedCardBackground != null ? `--ha-card-background: ${resolvedCardBackground}` : '',
 				this.config.card_border === false ? '--ha-card-border-width: 0; --ha-card-box-shadow: none' : '',
 				this.config.color != null ? `color: ${this.config.color}` : '',
 				this.config.font_size != null ? `font-size: ${this.config.font_size}em` : '',
@@ -271,7 +455,7 @@
 				this.config.stepper_input_pad_y != null ? `--stpc-stepper-input-pad-y: ${this.config.stepper_input_pad_y}` : '',
 				this.config.stepper_offset != null ? `--stpc-stepper-offset: ${this.config.stepper_offset}` : '',
 				this.config.stepper_stroke != null ? `--stpc-stepper-stroke: ${this.config.stepper_stroke}` : '',
-				this.config.input_background != null ? `--stpc-input-background: ${this.config.input_background}` : '',
+				resolvedInputBackground != null ? `--stpc-input-background: ${resolvedInputBackground}` : '',
 				this.config.input_padding != null ? `--stpc-input-padding: ${this.config.input_padding}` : '',
 				this.config.input_border_radius != null ? `--stpc-input-border-radius: ${this.config.input_border_radius}` : '',
 			].filter(Boolean).join('; ');
@@ -279,7 +463,14 @@
 			const suffixStyle = this._getSuffixStyle();
 
 			return html`
-				<ha-card .hass="${this._hass}" .config="${this.config}" style="${cardStyle}">
+				<ha-card
+					.hass="${this._hass}"
+					.config="${this.config}"
+					style="${cardStyle}${this.config.tap_sets_timer_id || this.config.hold_dismisses ? '; cursor: pointer' : ''}"
+					@pointerdown="${this._onCardPointerDown}"
+					@pointerup="${this._onCardPointerUp}"
+					@pointercancel="${this._onCardPointerCancel}"
+				>
 					${this.config.title ? html`<div class="card-header">${this.config.title}</div>` : ''}
 					<div class="wrapper">
 						${this._getActiveSegments().map((seg, i) => html`
@@ -290,6 +481,7 @@
 										class="input"
 										inputmode="numeric"
 										maxlength="2"
+										?readonly="${this.config.read_only}"
 										placeholder="${seg.placeholder}"
 										.value="${this[seg.prop]}"
 										@input="${(ev) => this._onInput(seg.key, ev)}"
@@ -297,7 +489,7 @@
 										@keydown="${this._onKeydown}"
 									/>
 								</div>
-								${this.config.show_steppers ? html`
+								${this.config.show_steppers && interactive ? html`
 									<button
 										type="button"
 										class="stepper-btn up"
@@ -326,10 +518,16 @@
 		}
 
 		_onStepperPointerDown(ev) {
+			if (this.config.read_only) {
+				return;
+			}
 			ev.preventDefault();
 		}
 
 		_stepSegment(segKey, delta) {
+			if (this.config.read_only) {
+				return;
+			}
 			const seg = this._getActiveSegments().find((item) => item.key === segKey);
 			if (!seg) {
 				return;
@@ -350,6 +548,9 @@
 		}
 
 		_onInput(segKey, ev) {
+			if (this.config.read_only) {
+				return;
+			}
 			const prop = { days: 'daysText', hours: 'hourText', minutes: 'minuteText', seconds: 'secondText' }[segKey];
 			const val = this._digitsOnly(ev.target.value);
 			ev.target.value = val;
@@ -361,6 +562,9 @@
 		}
 
 		_onKeydown(ev) {
+			if (this.config.read_only) {
+				return;
+			}
 			if (ev.key !== 'Enter') {
 				return;
 			}
@@ -370,6 +574,9 @@
 		}
 
 		_onCommit() {
+			if (this.config.read_only) {
+				return;
+			}
 			if (this.config.autosave) {
 				this._save();
 			}
@@ -411,7 +618,10 @@
 		}
 
 		_save() {
-			if (!this._hass || !this.stateObj) {
+			if (this.config.read_only) {
+				return;
+			}
+			if (!this._hass || !this.stateObj || !this.config.entity) {
 				return;
 			}
 			const segs = this._getActiveSegments();

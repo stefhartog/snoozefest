@@ -29,3 +29,4 @@ class Timer:
     id: str
     status: str = "active"
     temporary: bool = False
+    paused_remaining_seconds: Optional[int] = None

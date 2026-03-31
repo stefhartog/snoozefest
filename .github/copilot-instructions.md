@@ -44,6 +44,7 @@ This project is a local-first scheduler with Home Assistant MQTT discovery.
 - Keep voice automation docs/scripts aligned with current MQTT topic-prefix variable usage.
 - Document `command_result.request_id` as optional when request correlation is implemented.
 - Keep add-on docs aligned with Dockerfile source behavior (GitHub clone at build, cache-bust rules, and commit SHA visibility in logs).
+- Keep `TIMER_UI_ROADMAP.md` aligned with current UI migration decisions and compatibility constraints.
 
 ## Validation Before Finish
 
@@ -80,3 +81,12 @@ Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
   - **OPEN TASK**: Implement a working dev/prod MQTT prefix switch for this card.
     Preferred alternatives: comment-based toggle (like the timer list card) or reading
     from a `input_text.snoozefest_env` HA entity at runtime.
+
+### Timer detail popup card
+- `ha_dashboard_timer_detail_popup_card.yaml` currently uses `custom:config-template-card` + conditionals.
+- Keep changes conservative: avoid aggressive inline JS templating refactors in this YAML card; prior attempts caused non-rendering states.
+- Prefer roadmap-driven consolidation into dedicated JS cards (`TIMER_UI_ROADMAP.md`) rather than forcing complex logic into YAML.
+
+### Custom card naming note
+- `time_picker_custom.js` has grown beyond a pure time picker.
+- Plan naming cleanup during JS-card migration (with compatibility alias to avoid breaking existing dashboards).

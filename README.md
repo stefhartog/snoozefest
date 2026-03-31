@@ -79,6 +79,8 @@ Prefix comes from `mqtt_topic_prefix` in config (default: `snoozefest`).
 - <prefix>/cmd/timer/remove
 - <prefix>/cmd/timer/add_time
 - <prefix>/cmd/timer/snooze
+- <prefix>/cmd/timer/pause
+- <prefix>/cmd/timer/resume
 - <prefix>/cmd/timer/activate
 - <prefix>/cmd/timer/dismiss
 - <prefix>/cmd/settings/timer_add_seconds/set
@@ -121,6 +123,7 @@ Per-entity set topics are also used by HA discovery entities, for example:
 - Purge All removes only Snoozefest alarms/timers from scheduler state.
 - Timer discovery payloads are not republished every tick; runtime state updates are.
 - Ringing alarms and timers auto-dismiss after 5 minutes.
+- Timers support `inactive`, `active`, `paused`, and `ringing` states.
 - Recurring alarms do not catch up missed triggers after downtime by default.
 - IDs are compact numeric strings with max 25 alarms and 25 timers.
 
@@ -197,3 +200,6 @@ Three ready-to-use HA dashboard YAML files are included in the project root:
 | `ha_dashboard_alarms_auto_list_card.yaml` | Auto-list of all alarm entities |
 | `ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities (has a commented dev/prod prefix toggle) |
 | `ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
+| `ha_dashboard_timer_detail_popup_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
+
+For future UI consolidation, helper-removal planning, and JS card migration notes, see `TIMER_UI_ROADMAP.md`.

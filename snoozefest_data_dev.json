@@ -81,12 +81,23 @@
   "timers": [
     {
       "id": "1",
-      "label": "VA Timer: 10 seconds",
+      "label": "",
       "duration_seconds": 4,
-      "started_at": "2026-03-30T17:44:10.689182+00:00",
-      "expires_at": "2026-03-30T17:44:17.621755+00:00",
+      "started_at": "2026-03-30T21:38:12.990482+00:00",
+      "expires_at": "2026-03-30T21:38:19.438634+00:00",
       "status": "inactive",
-      "temporary": false
+      "temporary": false,
+      "paused_remaining_seconds": null
+    },
+    {
+      "id": "2",
+      "label": "New Timer",
+      "duration_seconds": 3660,
+      "started_at": "2026-03-30T21:48:15.002941+00:00",
+      "expires_at": "2026-03-30T22:49:08.002941+00:00",
+      "status": "paused",
+      "temporary": true,
+      "paused_remaining_seconds": 3649
     }
   ]
 }

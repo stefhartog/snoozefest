@@ -1,0 +1,97 @@
+type: custom:config-template-card
+variables:
+  - |-
+    (function () {
+      var rawId = states['input_text.snoozefest_timer_id'] && states['input_text.snoozefest_timer_id'].state
+        ? String(states['input_text.snoozefest_timer_id'].state).trim()
+        : '';
+      if (!rawId || rawId === 'unknown' || rawId === 'unavailable') {
+        return 'snoozefest_timer_1';
+      }
+
+      var rawEnv = states['input_text.snoozefest_env'] && states['input_text.snoozefest_env'].state
+        ? String(states['input_text.snoozefest_env'].state).trim()
+        : '';
+      var env = (rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable') ? rawEnv : 'snoozefest';
+      return env + '_timer_' + rawId;
+    })()
+entities:
+  - input_text.snoozefest_env
+  - input_text.snoozefest_timer_id
+  - ${'text.' + vars[0] + '_duration'}
+  - ${'sensor.' + vars[0] + '_remaining'}
+card:
+  type: vertical-stack
+  cards:
+    - type: markdown
+      content: |
+        ## Time Picker Mode Test
+        Top: editable set-time picker
+        Bottom: read-only countdown picker (same style)
+
+    - type: custom:snoozefest-time-picker-card
+      title: Editable (Set Time)
+      entity: ${'text.' + vars[0] + '_duration'}
+      read_only: false
+      show_days: true
+      show_seconds: true
+      separator_mode: units
+      autosave: true
+      color: var(--primary-text-color)
+      font_size: 2.5
+      suffix_font_size: 0.5em
+      suffix_opacity: 0.5
+      suffix_padding: 8px 0px 0px 0px
+      suffix_color: var(--secondary-text-color)
+      card_border: false
+      padding: 32px
+      padding_left_right: 10px
+      input_width: 1.2em
+      show_steppers: true
+      stepper_hit_height: 1.25em
+      stepper_color: var(--secondary-text-color)
+      stepper_opacity: 0.5
+      stepper_active_opacity: 0.9
+      stepper_input_pad_y: 0em
+      stepper_offset: 1.4em
+      stepper_size: 0.8em
+      stepper_stroke: 0.12em
+      pending_write_ms: 700
+      input_background: rgba(1,1,1,0.1)
+      input_border_radius: 0.2em
+      input_padding: 0.8em
+      content_justify: center
+
+    - type: custom:snoozefest-time-picker-card
+      title: Read-Only (Countdown)
+      entity: ${'text.' + vars[0] + '_duration'}
+      display_entity: ${'sensor.' + vars[0] + '_remaining'}
+      read_only: true
+      show_days: true
+      show_seconds: true
+      separator_mode: units
+      autosave: false
+      color: var(--primary-text-color)
+      font_size: 2.5
+      suffix_font_size: 0.5em
+      suffix_opacity: 0.5
+      suffix_padding: 8px 0px 0px 0px
+      suffix_color: var(--secondary-text-color)
+      card_border: false
+      padding: 32px
+      padding_left_right: 10px
+      input_width: 1.2em
+      show_steppers: true
+      stepper_hit_height: 1.25em
+      stepper_color: var(--secondary-text-color)
+      stepper_opacity: 0.5
+      stepper_active_opacity: 0.9
+      stepper_input_pad_y: 0em
+      stepper_offset: 1.4em
+      stepper_size: 0.8em
+      stepper_stroke: 0.12em
+      pending_write_ms: 700
+      input_background: rgba(1,1,1,0.1)
+      input_border_radius: 0.2em
+      input_padding: 0.8em
+      content_justify: center

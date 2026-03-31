@@ -180,10 +180,16 @@ class Store:
             status = "active"
         elif raw_status == "dismissed":
             status = "inactive"
-        elif raw_status in {"active", "inactive", "ringing", "snoozed"}:
+        elif raw_status == "snoozed":
+            # Legacy migration: timers no longer use snoozed state.
+            status = "active"
+        elif raw_status in {"active", "inactive", "ringing", "paused"}:
             status = raw_status
         else:
             status = "inactive"
+        paused_remaining_seconds = d.get("paused_remaining_seconds")
+        if paused_remaining_seconds is not None:
+            paused_remaining_seconds = max(0, int(paused_remaining_seconds))
         return Timer(
             id=d["id"],
             label=d["label"],
@@ -192,6 +198,7 @@ class Store:
             expires_at=datetime.fromisoformat(d["expires_at"]),
             status=status,
             temporary=d.get("temporary", False),
+            paused_remaining_seconds=(paused_remaining_seconds if status == "paused" else None),
         )
 
     # ------------------------------------------------------------------ save
@@ -240,6 +247,7 @@ class Store:
             "expires_at": t.expires_at.isoformat(),
             "status": t.status,
             "temporary": t.temporary,
+            "paused_remaining_seconds": t.paused_remaining_seconds,
         }
 
     # ------------------------------------------------------------------ accessor
