@@ -36,8 +36,8 @@ Use the quick start setup above for testing and local development. Creates a dev
 
 For persistent deployment on Home Assistant:
 
-1. Navigate to `addon/` folder
-2. Follow [addon/README.md](addon/README.md) for installation
+1. Navigate to `../ha-addons/snoozefest/` folder
+2. Follow [../ha-addons/snoozefest/README.md](../ha-addons/snoozefest/README.md) for installation
 3. See [MIGRATION.md](MIGRATION.md) for importing dev state to production
 
 When deployed as an add-on, Snoozefest publishes to the `snoozefest` MQTT namespace (distinct from local dev instance).
@@ -169,6 +169,8 @@ snoozefest --config config.json show-next
 ## Project layout
 
 ```text
+dashboard/
+voice/
 src/snoozefest/
   __main__.py
   cli.py
@@ -202,5 +204,16 @@ Dashboard YAML files and the custom time picker card are now grouped under `dash
 | `dashboard/ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
 | `dashboard/ha_dashboard_timer_detail_popup_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
 | `dashboard/time_picker_custom.js` | Custom Lovelace card powering the time picker UI |
+| `dashboard/input_text.js` | Custom Lovelace multiline text input card |
+
+## Voice automations
+
+Voice-related Home Assistant automations are grouped under `voice/`:
+
+| File | Purpose |
+|---|---|
+| `voice/ha_voice_master_automation.yaml` | Conversation routing automation for voice alarm/timer intents |
+| `voice/ha_voice_ringing_announce_automation.yaml` | Satellite announcement automation for ringing alarms/timers |
+| `voice/ha_voice_router.yaml` | Script-style MQTT command router used by voice flows |
 
 For future UI consolidation, helper-removal planning, and JS card migration notes, see `TIMER_UI_ROADMAP.md`.

@@ -89,9 +89,10 @@ State is stored as JSON and can be freely moved between deployments:
 ## Further Reading
 
 - [README.md](README.md) - Operating model and command reference  
-- [addon/README.md](addon/README.md) - Add-on installation and usage
-- [addon/BUILD.md](addon/BUILD.md) - Building/testing the add-on locally
+- [../ha-addons/snoozefest/README.md](../ha-addons/snoozefest/README.md) - Add-on installation and usage
+- [../ha-addons/snoozefest/BUILD.md](../ha-addons/snoozefest/BUILD.md) - Building/testing the add-on locally
 - [MIGRATION.md](MIGRATION.md) - Step-by-step migration from dev to production
+- [HANDOFF.md](HANDOFF.md) - Current workspace handoff and migration checklist
 
 ---
 
@@ -99,5 +100,5 @@ State is stored as JSON and can be freely moved between deployments:
 
 - **Issue Tracking**: GitHub Issues (project repository)
 - **Local Development**: See quick start section
-- **Add-on Development**: See [addon/BUILD.md](addon/BUILD.md)
+- **Add-on Development**: See [../ha-addons/snoozefest/BUILD.md](../ha-addons/snoozefest/BUILD.md)
 - **MQTT Debugging**: Use MQTT Explorer or HA MQTT tools to inspect topics

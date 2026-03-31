@@ -55,7 +55,7 @@ cp snoozefest_data_dev.json snoozefest_data_export.json
 
 ```bash
 # On HA host (via SSH or terminal)
-cd /path/to/snoozefest/addon
+cd /path/to/ha-addons/snoozefest
 
 # Build image
 docker build -t snoozefest:latest .
@@ -213,7 +213,7 @@ No data loss occurs; dev state (`snoozefest_data_dev.json`) remains separate fro
 
 ## Next Steps
 
-- Read [main README](../README.md) for operating model and command reference
+- Read [main README](README.md) for operating model and command reference
 - Consider setting up separate MQTT user for add-on with restricted ACL
 - Monitor add-on logs for first week of production
 - Archive workstation dev environment for future testing
