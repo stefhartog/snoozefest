@@ -81,6 +81,7 @@ class MQTTClient:
             "timer/add_time",
             "timer/pause",
             "timer/resume",
+            "timer/reset",
             "timer/activate",
             "timer/dismiss",
             "settings/timer_add_seconds/set",

@@ -638,6 +638,32 @@ class Scheduler:
             self._on_state_changed()
         return changed
 
+    def reset_timer(self, timer_id: Optional[str] = None) -> bool:
+        with self._lock:
+            now_utc = self._now_utc()
+            changed = False
+            for timer in self._store.state.timers:
+                if timer_id is not None and timer.id != timer_id:
+                    continue
+
+                if timer.status not in {"active", "ringing", "paused"}:
+                    continue
+
+                timer.status = "inactive"
+                timer.started_at = now_utc
+                timer.expires_at = now_utc
+                timer.paused_remaining_seconds = None
+                changed = True
+                if timer_id is not None:
+                    break
+
+            if changed:
+                self._store.save()
+
+        if changed:
+            self._on_state_changed()
+        return changed
+
     def pause_timer(self, timer_id: Optional[str] = None) -> bool:
         with self._lock:
             now_utc = self._now_utc()

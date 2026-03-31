@@ -802,6 +802,9 @@ class Daemon:
     def _timer_activate_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_activate"
 
+    def _timer_reset_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_reset"
+
     def _timer_pause_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_pause"
 
@@ -896,6 +899,12 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
             f"{self._timer_activate_object_id(timer_id)}/config"
+        )
+
+    def _timer_reset_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._timer_reset_object_id(timer_id)}/config"
         )
 
     def _timer_pause_discovery_topic(self, timer_id: str) -> str:
@@ -1082,6 +1091,18 @@ class Daemon:
                 "icon": "mdi:play",
                 "device": self._timer_device(timer, timer_id),
             }
+            reset_payload = {
+                "name": "13b Reset",
+                "unique_id": self._timer_reset_object_id(timer_id),
+                "object_id": self._timer_reset_object_id(timer_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/reset",
+                "payload_press": f'{{"id":"{timer_id}"}}',
+                "icon": "mdi:restore",
+                "device": self._timer_device(timer, timer_id),
+            }
             pause_payload = {
                 "name": "11 Pause",
                 "unique_id": self._timer_pause_object_id(timer_id),
@@ -1138,6 +1159,7 @@ class Daemon:
             self._mqtt.publish(self._timer_pause_discovery_topic(timer_id), pause_payload, retain=True)
             self._mqtt.publish(self._timer_resume_discovery_topic(timer_id), resume_payload, retain=True)
             self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), activate_payload, retain=True)
+            self._mqtt.publish(self._timer_reset_discovery_topic(timer_id), reset_payload, retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), dismiss_payload, retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
@@ -1173,6 +1195,7 @@ class Daemon:
             self._mqtt.publish(self._timer_pause_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_resume_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_reset_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), "", retain=True)
@@ -1729,6 +1752,7 @@ class Daemon:
                 "timer/add_time": self._cmd_timer_add_time,
                 "timer/pause":    self._cmd_timer_pause,
                 "timer/resume":   self._cmd_timer_resume,
+                "timer/reset":    self._cmd_timer_reset,
                 "timer/activate": self._cmd_timer_activate,
                 "timer/dismiss":  self._cmd_timer_dismiss,
                 "state/request":  self._cmd_state_request,
@@ -2242,6 +2266,20 @@ class Daemon:
                 self._ack("timer/activate", False, "No timers available to start or restart")
             else:
                 self._ack("timer/activate", False, f"Timer cannot be started or restarted: {timer_id}")
+
+    def _cmd_timer_reset(self, payload: dict) -> None:
+        timer_id_raw = payload.get("id")
+        timer_id = str(timer_id_raw) if timer_id_raw is not None else None
+        if self._scheduler.reset_timer(timer_id):
+            if timer_id is None:
+                self._ack("timer/reset", True, "Reset active, paused, or ringing timer(s)")
+            else:
+                self._ack("timer/reset", True, f"Timer reset: {timer_id}")
+        else:
+            if timer_id is None:
+                self._ack("timer/reset", False, "No active, paused, or ringing timers to reset")
+            else:
+                self._ack("timer/reset", False, f"Timer is not active, paused, or ringing: {timer_id}")
 
     def _cmd_timer_dismiss(self, payload: dict) -> None:
         timer_id_raw = payload.get("id")

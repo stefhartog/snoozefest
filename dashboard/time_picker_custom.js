@@ -1316,7 +1316,7 @@ const version = '0.3.16-custom';
 					this._pendingUntil = 0;
 				}
 			}
-			const parts = raw.split(':');
+			const parts = this._normalizeVisibleStateParts(raw);
 			this._getActiveSegments().forEach((seg, i) => {
 				this[seg.prop] = this._digitsOnly(parts[i] || '');
 			});
@@ -1324,6 +1324,25 @@ const version = '0.3.16-custom';
 
 		_digitsOnly(val) {
 			return String(val || '').replace(/\D/g, '').slice(0, 2);
+		}
+
+		_normalizeVisibleStateParts(raw) {
+			const parts = String(raw || '')
+				.split(':')
+				.map((part) => this._digitsOnly(part));
+
+			if (/^(text|input_text|sensor)\..+_timer_\d+_(?:duration|remaining(?:_friendly)?)$/.test(this.stateObj?.entity_id || '')) {
+				let normalized = [...parts];
+				if (!this.config.show_days && normalized.length === 4) {
+					normalized = normalized.slice(1);
+				}
+				if (!this.config.show_seconds && normalized.length > this._getActiveSegments().length) {
+					normalized = normalized.slice(0, this._getActiveSegments().length);
+				}
+				return normalized;
+			}
+
+			return parts;
 		}
 
 		_save() {
@@ -1356,7 +1375,6 @@ const version = '0.3.16-custom';
 				value,
 			});
 		}
-
 		getCardSize() {
 			return 1;
 		}

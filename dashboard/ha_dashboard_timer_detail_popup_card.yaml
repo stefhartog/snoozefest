@@ -32,6 +32,7 @@ card:
     - ${'button.' + vars[0] + '_pause'}
     - ${'button.' + vars[0] + '_resume'}
     - ${'button.' + vars[0] + '_activate'}
+    - ${'button.' + vars[0] + '_reset'}
     - ${'button.' + vars[0] + '_remove'}
     - ${'button.' + vars[0] + '_dismiss'}
   card:
@@ -112,18 +113,18 @@ card:
           entity: ${'text.' + vars[0] + '_duration'}
           display_entity: ${'sensor.' + vars[0] + '_remaining'}
           read_only: true
-          show_days: true
+          show_days: false
           show_seconds: true
           separator_mode: units
           autosave: false
           color: var(--primary-text-color)
-          font_size: 2.5
-          suffix_font_size: 0.5em
+          font_size: 3.5
+          suffix_font_size: 0.4em
           suffix_opacity: 0.5
           suffix_padding: 10px 0px 0px 0px
           suffix_color: var(--secondary-text-color)
           card_border: false
-          padding: 40px
+          padding: 50px
           input_width: 1.2em
           show_steppers: true
           stepper_hit_height: 1.25em
@@ -151,18 +152,18 @@ card:
           type: custom:snoozefest-time-picker-card
           entity: ${'text.' + vars[0] + '_duration'}
           read_only: false
-          show_days: true
+          show_days: false
           show_seconds: true
           separator_mode: units
           autosave: true
           color: var(--primary-text-color)
-          font_size: 2.5
-          suffix_font_size: 0.5em
+          font_size: 3.5
+          suffix_font_size: 0.4em
           suffix_opacity: 0.5
-          suffix_padding: 10px 0px 0px 0px
+          suffix_padding: 45px 5px 0px 0px
           suffix_color: var(--secondary-text-color)
           card_border: false
-          padding: 40px
+          padding: 50px
           input_width: 1.2em
           show_steppers: true
           stepper_hit_height: 1.25em
@@ -371,26 +372,44 @@ card:
                   - padding: 2px
           - type: conditional
             conditions:
+              - entity: ${'sensor.' + vars[0] + '_status'}
+                state: Inactive
               - entity: ${'text.' + vars[0] + '_duration'}
                 state_not: "00:00:00:00"
             card:
               type: custom:button-card
-              name: |-
-                ${(() => {
-                  const status = String(states['sensor.' + vars[0] + '_status']?.state || '').toLowerCase();
-                  return (status === 'active' || status === 'ringing' || status === 'paused') ? 'Restart' : 'Start';
-                })()}
-              icon: |-
-                ${(() => {
-                  const status = String(states['sensor.' + vars[0] + '_status']?.state || '').toLowerCase();
-                  return (status === 'active' || status === 'ringing' || status === 'paused') ? 'mdi:restart' : 'mdi:play';
-                })()}
+              name: Start
+              icon: mdi:play
               entity: ${'button.' + vars[0] + '_activate'}
               tap_action:
                 action: call-service
                 service: button.press
                 data:
                   entity_id: ${'button.' + vars[0] + '_activate'}
+              styles:
+                name:
+                  - color: var(--primary-text-color)
+                  - font-size: 0.8em
+                  - padding: 3px
+                icon:
+                  - color: var(--primary-text-color)
+                  - padding: 2px
+          - type: conditional
+            conditions:
+              - entity: ${'sensor.' + vars[0] + '_status'}
+                state_not: Inactive
+              - entity: ${'text.' + vars[0] + '_duration'}
+                state_not: "00:00:00:00"
+            card:
+              type: custom:button-card
+              name: Reset
+              icon: mdi:restore
+              entity: ${'button.' + vars[0] + '_reset'}
+              tap_action:
+                action: call-service
+                service: button.press
+                data:
+                  entity_id: ${'button.' + vars[0] + '_reset'}
               styles:
                 name:
                   - color: var(--primary-text-color)

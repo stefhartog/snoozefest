@@ -106,24 +106,24 @@ card:
                 - font-size: 0.7em
                 - color: rgba(255,255,255,0.2)
       - type: grid
-        columns: 2
+        columns: 1
         square: false
         cards:
           - type: custom:snoozefest-time-picker-card
             entity: ${'text.' + vars[0] + '_time'}
             autosave: true
             color: var(--primary-text-color)
-            font_size: 2.5
+            font_size: 3.5
             suffix_font_size: 0.5em
             suffix_opacity: 0.5
             suffix_padding: 8px 0px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
-            padding: 32px
+            padding: 50px
             padding_left_right: 10px
-            input_width: 1.2em
+            input_width: 1.5em
             show_steppers: true
-            stepper_hit_height: 1.25em
+            stepper_hit_height: 0.5em
             stepper_color: var(--secondary-text-color)
             stepper_opacity: 0.5
             stepper_active_opacity: 0.9
@@ -136,16 +136,6 @@ card:
             input_border_radius: 0.2em
             input_padding: 0.5em
             content_justify: center
-          - type: button
-            entity: ${'switch.' + vars[0]}
-            show_name: false
-            show_icon: true
-            show_state: false
-            icon: >-
-              ${states['switch.' + vars[0]] && states['switch.' + vars[0]
-              ].state === 'on' ? 'mdi:power' : 'mdi:power-cycle'}
-            tap_action:
-              action: toggle
       - type: horizontal-stack
         cards:
           - type: custom:button-card
@@ -153,13 +143,14 @@ card:
             color_type: card
             name: Mon
             show_icon: false
+            radius: 4px
             tap_action:
               action: toggle
             styles:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_1'}
             color_type: card
@@ -171,7 +162,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_2'}
             color_type: card
@@ -183,7 +174,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_3'}
             color_type: card
@@ -195,7 +186,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_4'}
             color_type: card
@@ -207,7 +198,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_5'}
             color_type: card
@@ -219,7 +210,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_6'}
             color_type: card
@@ -231,7 +222,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
       - type: grid
         columns: 4
         square: false
@@ -249,10 +240,10 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
               icon:
                 - color: var(--primary-text-color)
-                - padding: 2px
+                - padding: 6px
           - type: custom:button-card
             name: Dismiss
             icon: mdi:alarm-off
@@ -266,10 +257,10 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
               icon:
                 - color: var(--primary-text-color)
-                - padding: 2px
+                - padding: 6px
           - type: custom:button-card
             name: Remove
             icon: mdi:delete
@@ -290,10 +281,10 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
               icon:
                 - color: var(--primary-text-color)
-                - padding: 2px
+                - padding: 6px
           - type: custom:button-card
             name: Done
             icon: mdi:check
@@ -307,7 +298,7 @@ card:
               name:
                 - color: var(--primary-text-color)
                 - font-size: 0.8em
-                - padding: 3px
+                - padding: 6px
               icon:
                 - color: var(--primary-text-color)
-                - padding: 2px
+                - padding: 6px
