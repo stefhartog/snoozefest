@@ -121,7 +121,7 @@ card:
           font_size: 3.5
           suffix_font_size: 0.4em
           suffix_opacity: 0.5
-          suffix_padding: 10px 0px 0px 0px
+          suffix_padding: 45px 5px 0px 0px
           suffix_color: var(--secondary-text-color)
           card_border: false
           padding: 50px
@@ -137,10 +137,11 @@ card:
           stepper_stroke: 0.12em
           pending_write_ms: 700
           status_color_target: input
-          status_color_default: rgba(1,1,1,0.1)
-          status_color_active: rgba(40,167,69,0.18)
-          status_color_paused: rgba(255,193,7,0.18)
-          status_color_ringing: rgba(220,53,69,0.18)
+          status_color_default: var(--secondary-back-color)
+          status_color_active: rgba(43, 71, 150,0.3)
+          status_color_paused: rgba(138, 128, 51,0.3)
+          status_color_snoozed: rgba(138, 128, 51,0.3)
+          status_color_ringing: rgba(145, 50, 44,0.3)
           input_border_radius: 0.2em
           input_padding: 0.4em
           content_justify: center

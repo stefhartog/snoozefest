@@ -114,16 +114,16 @@ card:
             autosave: true
             color: var(--primary-text-color)
             font_size: 3.5
-            suffix_font_size: 0.5em
+            suffix_font_size: 0.6em
             suffix_opacity: 0.5
-            suffix_padding: 8px 0px 0px 0px
+            suffix_padding: 0px 0px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
             padding: 50px
             padding_left_right: 10px
             input_width: 1.5em
             show_steppers: true
-            stepper_hit_height: 0.5em
+            stepper_hit_height: 1.25em
             stepper_color: var(--secondary-text-color)
             stepper_opacity: 0.5
             stepper_active_opacity: 0.9

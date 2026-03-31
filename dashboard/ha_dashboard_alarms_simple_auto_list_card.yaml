@@ -37,7 +37,7 @@ cards:
             status_color_target: card
             status_color_default: var(--secondary-back-color)
             status_color_active: rgba(43, 71, 150,0.3)
-            status_color_paused: rgba(44, 145, 1321,0.3)
+            status_color_paused: rgba(44, 145, 132,0.3)
             status_color_snoozed: rgba(138, 128, 51,0.3)
             status_color_ringing: rgba(145, 50, 44,0.3)
             input_border_radius: 0.2em

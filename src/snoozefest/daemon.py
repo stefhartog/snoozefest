@@ -2115,13 +2115,13 @@ class Daemon:
     def _cmd_timer_new(self, payload: dict) -> None:
         """Create a new timer. Payload can include:
         - duration_seconds: int (default: 0)
-        - label: string (default: "New Timer")
+        - label: string (default: "")
         - active: bool (default: true when payload is non-empty, else false)
         - temporary: bool (default: true)
         """
         duration = self._parse_duration_seconds(payload, default_seconds=0)
         
-        label = payload.get("label", "New Timer")
+        label = payload.get("label", "")
         is_active = bool(payload.get("active", payload.get("running", bool(payload))))
         temporary = bool(payload.get("temporary", True))
         initial_status = "active" if is_active else "inactive"
@@ -2136,7 +2136,7 @@ class Daemon:
 
     def _cmd_timer_set(self, payload: dict) -> None:
         duration = self._parse_duration_seconds(payload, default_seconds=300)
-        label = str(payload.get("label", "Timer"))
+        label = str(payload.get("label", ""))
         temporary = bool(payload.get("temporary", True))
         timer = self._scheduler.add_timer(duration, label, initial_status="inactive", temporary=temporary)
         temp_suffix = " temporary" if temporary else ""
