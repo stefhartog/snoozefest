@@ -1,646 +1,290 @@
-type: conditional
-conditions:
-  - condition: or
-    conditions:
-      - condition: state
-        entity: input_text.snoozefest_alarm_id
-        state: ""
-      - condition: not
-        conditions:
-          - condition: numeric_state
+visibility:
+  - condition: state
+    entity: input_text.snoozefest_alarm_id
+    state: ""
+type: vertical-stack
+cards:
+  - type: heading
+    heading: Alarms
+  - type: custom:auto-entities
+    card:
+      type: vertical-stack
+    card_param: cards
+    filter:
+      include:
+        - entity_id: /^sensor\.[a-z0-9_]+_alarm_\d+_remaining$/
+          options:
+            type: custom:snoozefest-time-picker-card
             entity: input_text.snoozefest_alarm_id
-            above: 0
-card:
-  type: vertical-stack
-  cards:
-    - type: heading
-      heading: Alarms
-    - type: conditional
-      conditions:
-        - entity: input_text.snoozefest_env
-          state: snoozefest_dev
-      card:
-        type: custom:auto-entities
-        card:
-          type: vertical-stack
-        card_param: cards
-        filter:
-          include:
-            - entity_id: /^switch\.snoozefest_dev_alarm_\d+$/
-              sort:
-                method: entity_id
-              options:
-                type: custom:button-card
-                entity: this.entity_id
-                triggers_update: all
-                show_icon: false
-                show_name: true
-                show_label: true
-                show_state: false
-                hidden: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    return !(status === 'ringing' || status === 'snoozed');
-                  ]]]
-                name: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--:--';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    if (status === 'snoozed') {
-                      const remainingId = 'sensor.' + base + '_remaining';
-                      const rawRemaining = String(states[remainingId]?.state || '--:--').trim();
-                      let dd = 0, hh = 0, mm = 0, ss = 0;
-                      if (/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [dd, hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else {
-                        return rawRemaining;
-                      }
-                      let out = '';
-                      if (dd > 0) out += `${dd}d`;
-                      if (hh > 0 || dd > 0) out += `${hh}h`;
-                      if (mm > 0 || hh > 0 || dd > 0) out += `${mm}m`;
-                      out += `${ss}s`;
-                      return out;
-                    }
-                    const timeId = 'text.' + base + '_time';
-                    const raw = String(states[timeId]?.state || '--:--');
-                    return raw.replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-                  ]]]
-                label: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--';
-                    const base = eid.replace(/^switch\./, '');
-                    const dayId = 'sensor.' + base + '_next_day';
-                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                    const selectedDays = dayNames.filter((_, index) => {
-                      return states['switch.' + base + '_weekday_' + index]?.state === 'on';
-                    });
-                    if (selectedDays.length > 0 && selectedDays.length < 7) {
-                      return selectedDays.join(' ');
-                    }
-                    return states[dayId]?.state || 'Unscheduled';
-                  ]]]
-                color_type: card
-                styles:
-                  card:
-                    - padding: 16px 18px
-                    - padding-bottom: 20px
-                    - background: |
-                        [[[ 
-                          const eid = entity?.entity_id || '';
-                          if (!eid) {
-                            return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                          }
-                          const base = eid.replace(/^switch\./, '');
-                          const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                          if (status === 'ringing') return 'rgba(220, 53, 69, 0.18)';
-                          if (status === 'snoozed') return 'rgba(255, 193, 7, 0.18)';
-                          if (status === 'active') return 'rgba(40, 167, 69, 0.18)';
-                          return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                        ]]]
-                    - box-shadow: none
-                    - min-height: 84px
-                  grid:
-                    - grid-template-areas: "\"l\" \"n\""
-                    - grid-template-columns: 1fr
-                    - grid-template-rows: min-content min-content
-                    - row-gap: 8px
-                  label:
-                    - justify-self: start
-                    - align-self: end
-                    - text-align: left
-                    - font-size: 0.8rem
-                    - color: var(--secondary-text-color)
-                    - padding: 0
-                  name:
-                    - justify-self: start
-                    - align-self: start
-                    - text-align: left
-                    - font-size: 2.5rem
-                    - line-height: 1
-                    - font-weight: 600
-                    - padding: 0
-                tap_action:
-                  action: call-service
-                  service: input_text.set_value
-                  data:
-                    entity_id: input_text.snoozefest_alarm_id
-                    value: |
-                      [[[ 
-                        const eid = entity?.entity_id || '';
-                        return eid.match(/alarm_(\d+)$/)?.[1] || '';
-                      ]]]
-                hold_action:
-                  action: toggle
-            - entity_id: /^switch\.snoozefest_dev_alarm_\d+$/
-              sort:
-                method: state
-                reverse: true
-              options:
-                type: custom:button-card
-                entity: this.entity_id
-                triggers_update: all
-                show_icon: false
-                show_name: true
-                show_label: true
-                show_state: false
-                hidden: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    return !(status === 'active' || status === 'inactive' || status === '');
-                  ]]]
-                name: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--:--';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    if (status === 'snoozed') {
-                      const remainingId = 'sensor.' + base + '_remaining';
-                      const rawRemaining = String(states[remainingId]?.state || '--:--').trim();
-                      let dd = 0, hh = 0, mm = 0, ss = 0;
-                      if (/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [dd, hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else {
-                        return rawRemaining;
-                      }
-                      let out = '';
-                      if (dd > 0) out += `${dd}d`;
-                      if (hh > 0 || dd > 0) out += `${hh}h`;
-                      if (mm > 0 || hh > 0 || dd > 0) out += `${mm}m`;
-                      out += `${ss}s`;
-                      return out;
-                    }
-                    const timeId = 'text.' + base + '_time';
-                    const raw = String(states[timeId]?.state || '--:--');
-                    return raw.replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-                  ]]]
-                label: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--';
-                    const base = eid.replace(/^switch\./, '');
-                    const dayId = 'sensor.' + base + '_next_day';
-                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                    const selectedDays = dayNames.filter((_, index) => {
-                      return states['switch.' + base + '_weekday_' + index]?.state === 'on';
-                    });
-                    if (selectedDays.length > 0 && selectedDays.length < 7) {
-                      return selectedDays.join(' ');
-                    }
-                    return states[dayId]?.state || 'Unscheduled';
-                  ]]]
-                color_type: card
-                styles:
-                  card:
-                    - padding: 16px 18px
-                    - padding-bottom: 20px
-                    - background: |
-                        [[[ 
-                          const eid = entity?.entity_id || '';
-                          if (!eid) {
-                            return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                          }
-                          const base = eid.replace(/^switch\./, '');
-                          const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                          if (status === 'ringing') return 'rgba(220, 53, 69, 0.18)';
-                          if (status === 'snoozed') return 'rgba(255, 193, 7, 0.18)';
-                          if (status === 'active') return 'rgba(40, 167, 69, 0.18)';
-                          return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                        ]]]
-                    - box-shadow: none
-                    - min-height: 84px
-                  grid:
-                    - grid-template-areas: "\"l\" \"n\""
-                    - grid-template-columns: 1fr
-                    - grid-template-rows: min-content min-content
-                    - row-gap: 8px
-                  label:
-                    - justify-self: start
-                    - align-self: end
-                    - text-align: left
-                    - font-size: 0.8rem
-                    - color: var(--secondary-text-color)
-                    - padding: 0
-                  name:
-                    - justify-self: start
-                    - align-self: start
-                    - text-align: left
-                    - font-size: 2.5rem
-                    - line-height: 1
-                    - font-weight: 600
-                    - padding: 0
-                tap_action:
-                  action: call-service
-                  service: input_text.set_value
-                  data:
-                    entity_id: input_text.snoozefest_alarm_id
-                    value: |
-                      [[[ 
-                        const eid = entity?.entity_id || '';
-                        return eid.match(/alarm_(\d+)$/)?.[1] || '';
-                      ]]]
-                hold_action:
-                  action: toggle
-    - type: conditional
-      conditions:
-        - entity: input_text.snoozefest_env
-          state_not: snoozefest_dev
-      card:
-        type: custom:auto-entities
-        card:
-          type: vertical-stack
-        card_param: cards
-        filter:
-          include:
-            - entity_id: /^switch\.snoozefest_alarm_\d+$/
-              sort:
-                method: entity_id
-              options:
-                type: custom:button-card
-                entity: this.entity_id
-                triggers_update: all
-                show_icon: false
-                show_name: true
-                show_label: true
-                show_state: false
-                hidden: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    return !(status === 'ringing' || status === 'snoozed');
-                  ]]]
-                name: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--:--';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    if (status === 'snoozed') {
-                      const remainingId = 'sensor.' + base + '_remaining';
-                      const rawRemaining = String(states[remainingId]?.state || '--:--').trim();
-                      let dd = 0, hh = 0, mm = 0, ss = 0;
-                      if (/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [dd, hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else {
-                        return rawRemaining;
-                      }
-                      let out = '';
-                      if (dd > 0) out += `${dd}d`;
-                      if (hh > 0 || dd > 0) out += `${hh}h`;
-                      if (mm > 0 || hh > 0 || dd > 0) out += `${mm}m`;
-                      out += `${ss}s`;
-                      return out;
-                    }
-                    const timeId = 'text.' + base + '_time';
-                    const raw = String(states[timeId]?.state || '--:--');
-                    return raw.replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-                  ]]]
-                label: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--';
-                    const base = eid.replace(/^switch\./, '');
-                    const dayId = 'sensor.' + base + '_next_day';
-                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                    const selectedDays = dayNames.filter((_, index) => {
-                      return states['switch.' + base + '_weekday_' + index]?.state === 'on';
-                    });
-                    if (selectedDays.length > 0 && selectedDays.length < 7) {
-                      return selectedDays.join(' ');
-                    }
-                    return states[dayId]?.state || 'Unscheduled';
-                  ]]]
-                color_type: card
-                styles:
-                  card:
-                    - padding: 16px 18px
-                    - padding-bottom: 20px
-                    - background: |
-                        [[[ 
-                          const eid = entity?.entity_id || '';
-                          if (!eid) {
-                            return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                          }
-                          const base = eid.replace(/^switch\./, '');
-                          const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                          if (status === 'ringing') return 'rgba(220, 53, 69, 0.18)';
-                          if (status === 'snoozed') return 'rgba(255, 193, 7, 0.18)';
-                          if (status === 'active') return 'rgba(40, 167, 69, 0.18)';
-                          return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                        ]]]
-                    - box-shadow: none
-                    - min-height: 84px
-                  grid:
-                    - grid-template-areas: "\"l\" \"n\""
-                    - grid-template-columns: 1fr
-                    - grid-template-rows: min-content min-content
-                    - row-gap: 8px
-                  label:
-                    - justify-self: start
-                    - align-self: end
-                    - text-align: left
-                    - font-size: 0.8rem
-                    - color: var(--secondary-text-color)
-                    - padding: 0
-                  name:
-                    - justify-self: start
-                    - align-self: start
-                    - text-align: left
-                    - font-size: 2.5rem
-                    - line-height: 1
-                    - font-weight: 600
-                    - padding: 0
-                tap_action:
-                  action: call-service
-                  service: input_text.set_value
-                  data:
-                    entity_id: input_text.snoozefest_alarm_id
-                    value: |
-                      [[[ 
-                        const eid = entity?.entity_id || '';
-                        return eid.match(/alarm_(\d+)$/)?.[1] || '';
-                      ]]]
-                hold_action:
-                  action: toggle
-            - entity_id: /^switch\.snoozefest_alarm_\d+$/
-              sort:
-                method: state
-                reverse: true
-              options:
-                type: custom:button-card
-                entity: this.entity_id
-                triggers_update: all
-                show_icon: false
-                show_name: true
-                show_label: true
-                show_state: false
-                hidden: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    return !(status === 'active' || status === 'inactive' || status === '');
-                  ]]]
-                name: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--:--';
-                    const base = eid.replace(/^switch\./, '');
-                    const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                    if (status === 'snoozed') {
-                      const remainingId = 'sensor.' + base + '_remaining';
-                      const rawRemaining = String(states[remainingId]?.state || '--:--').trim();
-                      let dd = 0, hh = 0, mm = 0, ss = 0;
-                      if (/^\d{2}:\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [dd, hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [hh, mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else if (/^\d{2}:\d{2}$/.test(rawRemaining)) {
-                        [mm, ss] = rawRemaining.split(':').map((n) => Number(n));
-                      } else {
-                        return rawRemaining;
-                      }
-                      let out = '';
-                      if (dd > 0) out += `${dd}d`;
-                      if (hh > 0 || dd > 0) out += `${hh}h`;
-                      if (mm > 0 || hh > 0 || dd > 0) out += `${mm}m`;
-                      out += `${ss}s`;
-                      return out;
-                    }
-                    const timeId = 'text.' + base + '_time';
-                    const raw = String(states[timeId]?.state || '--:--');
-                    return raw.replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-                  ]]]
-                label: |
-                  [[[ 
-                    const eid = entity?.entity_id || '';
-                    if (!eid) return '--';
-                    const base = eid.replace(/^switch\./, '');
-                    const dayId = 'sensor.' + base + '_next_day';
-                    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                    const selectedDays = dayNames.filter((_, index) => {
-                      return states['switch.' + base + '_weekday_' + index]?.state === 'on';
-                    });
-                    if (selectedDays.length > 0 && selectedDays.length < 7) {
-                      return selectedDays.join(' ');
-                    }
-                    return states[dayId]?.state || 'Unscheduled';
-                  ]]]
-                color_type: card
-                styles:
-                  card:
-                    - padding: 16px 18px
-                    - padding-bottom: 20px
-                    - background: |
-                        [[[ 
-                          const eid = entity?.entity_id || '';
-                          if (!eid) {
-                            return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                          }
-                          const base = eid.replace(/^switch\./, '');
-                          const status = String(states['sensor.' + base + '_status']?.state || '').toLowerCase();
-                          if (status === 'ringing') return 'rgba(220, 53, 69, 0.18)';
-                          if (status === 'snoozed') return 'rgba(255, 193, 7, 0.18)';
-                          if (status === 'active') return 'rgba(40, 167, 69, 0.18)';
-                          return 'var(--ha-card-background, var(--card-background-color, var(--secondary-background-color)))';
-                        ]]]
-                    - box-shadow: none
-                    - min-height: 84px
-                  grid:
-                    - grid-template-areas: "\"l\" \"n\""
-                    - grid-template-columns: 1fr
-                    - grid-template-rows: min-content min-content
-                    - row-gap: 8px
-                  label:
-                    - justify-self: start
-                    - align-self: end
-                    - text-align: left
-                    - font-size: 0.8rem
-                    - color: var(--secondary-text-color)
-                    - padding: 0
-                  name:
-                    - justify-self: start
-                    - align-self: start
-                    - text-align: left
-                    - font-size: 2.5rem
-                    - line-height: 1
-                    - font-weight: 600
-                    - padding: 0
-                tap_action:
-                  action: call-service
-                  service: input_text.set_value
-                  data:
-                    entity_id: input_text.snoozefest_alarm_id
-                    value: |
-                      [[[ 
-                        const eid = entity?.entity_id || '';
-                        return eid.match(/alarm_(\d+)$/)?.[1] || '';
-                      ]]]
-                hold_action:
-                  action: toggle
-    - type: grid
-      columns: 3
-      square: false
-      cards:
-        - type: custom:button-card
-          color_type: blank-card
-        - type: custom:button-card
-          color_type: blank-card
-        - type: custom:button-card
-          show_icon: false
-          show_name: true
-          show_label: true
-          triggers_update: all
-          update_timer: 2
-          name: |
-            [[[ 
-              const rawEnv = states['input_text.snoozefest_env']?.state;
-              const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                ? rawEnv
-                : 'snoozefest';
-              const usedIds = Object.keys(states)
-                .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
-                .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-              return usedIds.length >= 12 ? 'Max' : '+';
-            ]]]
-          label: |
-            [[[ 
-              const rawEnv = states['input_text.snoozefest_env']?.state;
-              const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                ? rawEnv
-                : 'snoozefest';
-              const usedIds = Object.keys(states)
-                .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
-                .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-              return usedIds.length >= 12 ? 'Maximum alarms reached (12)' : '';
-            ]]]
-          color_type: card
-          styles:
-            card:
-              - min-height: 80px
-              - background: |
-                  [[[ 
-                    const rawEnv = states['input_text.snoozefest_env']?.state;
-                    const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                      ? rawEnv
-                      : 'snoozefest';
-                    const usedIds = Object.keys(states)
-                      .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                      .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
-                      .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-                    return usedIds.length >= 12
-                      ? 'color-mix(in srgb, var(--disabled-text-color) 20%, transparent)'
-                      : 'color-mix(in srgb, var(--primary-color) 14%, transparent)';
-                  ]]]
-              - opacity: |
-                  [[[ 
-                    const rawEnv = states['input_text.snoozefest_env']?.state;
-                    const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                      ? rawEnv
-                      : 'snoozefest';
-                    const usedIds = Object.keys(states)
-                      .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                      .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
-                      .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-                    return usedIds.length >= 12 ? '0.65' : '1';
-                  ]]]
-            name:
-              - color: |
-                  [[[ 
-                    const rawEnv = states['input_text.snoozefest_env']?.state;
-                    const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                      ? rawEnv
-                      : 'snoozefest';
-                    const usedIds = Object.keys(states)
-                      .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                      .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
-                      .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-                    return usedIds.length >= 12 ? 'var(--disabled-text-color)' : 'var(--primary-color)';
-                  ]]]
-              - font-size: |
-                  [[[ 
-                    const rawEnv = states['input_text.snoozefest_env']?.state;
-                    const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                      ? rawEnv
-                      : 'snoozefest';
-                    const usedIds = Object.keys(states)
-                      .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                      .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
-                      .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-                    return usedIds.length >= 12 ? '1.4rem' : '3rem';
-                  ]]]
-              - line-height: 1
-              - font-weight: 600
-            label:
-              - color: var(--secondary-text-color)
-              - font-size: 0.8rem
-              - padding-top: 6px
-          tap_action:
-            action: javascript
-            javascript: |
-              [[[ 
-                (async () => {
-                  const hass = this._hass;
-                  const rawEnv = hass.states['input_text.snoozefest_env']?.state;
-                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+            display_entity: this.entity_id
+            read_only: true
+            show_days: false
+            show_seconds: false
+            separator_mode: colon
+            autosave: false
+            color: var(--primary-text-color)
+            font_size: 2
+            suffix_font_size: 0.5em
+            suffix_opacity: 0.5
+            suffix_padding: 10px 0px 0px 0px
+            suffix_color: var(--secondary-text-color)
+            card_border: false
+            padding: 12px 14px
+            input_width: 1.2em
+            show_steppers: false
+            pending_write_ms: 700
+            status_color_target: input
+            status_color_default: rgba(1,1,1,0.1)
+            status_color_inactive: rgba(1,1,1,0.1)
+            status_color_active: rgba(40,167,69,0.18)
+            status_color_paused: rgba(255,193,7,0.18)
+            status_color_ringing: rgba(220,53,69,0.18)
+            input_border_radius: 0.2em
+            input_padding: 0.4em
+            content_justify: center
+            tap_sets_timer_id: input_text.snoozefest_alarm_id
+            hold_dismisses: true
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:button-card
+        color_type: blank-card
+      - type: custom:button-card
+        color_type: blank-card
+      - type: custom:button-card
+        show_icon: false
+        show_name: true
+        show_label: true
+        triggers_update: all
+        update_timer: 2
+        name: |
+          [[[ 
+            const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
+            const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+              ? rawEnv
+              : '';
+            const discoveredEnvs = Object.keys(states)
+              .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+              .filter((m) => !!m)
+              .map((m) => m[1]);
+            const env = helperEnv && states[`button.${helperEnv}_manager_add_alarm`]
+              ? helperEnv
+              : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+            const statusIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+            const switchIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+            const usedIds = [...new Set([...statusIds, ...switchIds])]
+              .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+            return usedIds.length >= 12 ? 'Max' : '+';
+          ]]]
+        label: |
+          [[[ 
+            const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
+            const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+              ? rawEnv
+              : '';
+            const discoveredEnvs = Object.keys(states)
+              .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+              .filter((m) => !!m)
+              .map((m) => m[1]);
+            const env = helperEnv && states[`button.${helperEnv}_manager_add_alarm`]
+              ? helperEnv
+              : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+            const statusIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+            const switchIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+            const usedIds = [...new Set([...statusIds, ...switchIds])]
+              .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+            return usedIds.length >= 12 ? 'Maximum alarms reached (12)' : '';
+          ]]]
+        color_type: card
+        styles:
+          card:
+            - min-height: 80px
+            - background: |
+                [[[ 
+                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
+                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
                     ? rawEnv
-                    : 'snoozefest';
-
-                  const usedIds = Object.keys(hass.states)
+                    : '';
+                  const discoveredEnvs = Object.keys(states)
+                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+                    .filter((m) => !!m)
+                    .map((m) => m[1]);
+                  const env = helperEnv && states[`button.${helperEnv}_manager_add_alarm`]
+                    ? helperEnv
+                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
                     .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
-                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12
+                    ? 'color-mix(in srgb, var(--disabled-text-color) 20%, transparent)'
+                    : 'color-mix(in srgb, var(--primary-color) 14%, transparent)';
+                ]]]
+            - opacity: |
+                [[[ 
+                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
+                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : '';
+                  const discoveredEnvs = Object.keys(states)
+                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+                    .filter((m) => !!m)
+                    .map((m) => m[1]);
+                  const env = helperEnv && states[`button.${helperEnv}_manager_add_alarm`]
+                    ? helperEnv
+                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12 ? '0.65' : '1';
+                ]]]
+          name:
+            - color: |
+                [[[ 
+                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
+                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : '';
+                  const discoveredEnvs = Object.keys(states)
+                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+                    .filter((m) => !!m)
+                    .map((m) => m[1]);
+                  const env = helperEnv && states[`button.${helperEnv}_manager_add_alarm`]
+                    ? helperEnv
+                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12 ? 'var(--disabled-text-color)' : 'var(--primary-color)';
+                ]]]
+            - font-size: |
+                [[[ 
+                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
+                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                    ? rawEnv
+                    : '';
+                  const discoveredEnvs = Object.keys(states)
+                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+                    .filter((m) => !!m)
+                    .map((m) => m[1]);
+                  const env = helperEnv && states[`button.${helperEnv}_manager_add_alarm`]
+                    ? helperEnv
+                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
+                    .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+                  return usedIds.length >= 12 ? '1.4rem' : '3rem';
+                ]]]
+            - line-height: 1
+            - font-weight: 600
+          label:
+            - color: var(--secondary-text-color)
+            - font-size: 0.8rem
+            - padding-top: 6px
+        tap_action:
+          action: javascript
+          javascript: |
+            [[[ 
+              (async () => {
+                const hass = this._hass;
+                const getHass = () => this._hass || hass;
+                const rawEnv = String(hass.states['input_text.snoozefest_env']?.state || '').trim();
+                const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                  ? rawEnv
+                  : '';
+                const discoveredEnvs = Object.keys(hass.states)
+                  .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_alarm$/))
+                  .filter((m) => !!m)
+                  .map((m) => m[1]);
+                const env = helperEnv && hass.states[`button.${helperEnv}_manager_add_alarm`]
+                  ? helperEnv
+                  : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                const managerAddButton = `button.${env}_manager_add_alarm`;
 
-                  if (usedIds.length >= 12) {
-                    helpers.toastMessage('Maximum alarms reached (12)');
-                    return;
+                if (!hass.states[managerAddButton]) {
+                  helpers.toastMessage(`Add button not found for prefix: ${env}`);
+                  return;
+                }
+
+                const statusIds = Object.keys(hass.states)
+                  .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                  .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                const switchIds = Object.keys(hass.states)
+                  .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                  .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                const usedIds = [...new Set([...statusIds, ...switchIds])]
+                  .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
+
+                if (usedIds.length >= 12) {
+                  helpers.toastMessage('Maximum alarms reached (12)');
+                  return;
+                }
+
+                let nextId = null;
+                for (let i = 1; i <= 12; i += 1) {
+                  if (!usedIds.includes(i)) {
+                    nextId = i;
+                    break;
                   }
+                }
 
-                  let nextId = null;
-                  for (let i = 1; i <= 12; i += 1) {
-                    if (!usedIds.includes(i)) {
-                      nextId = i;
-                      break;
-                    }
+                if (!nextId) {
+                  helpers.toastMessage('No free alarm ID available');
+                  return;
+                }
+
+                await hass.callService('button', 'press', {
+                  entity_id: managerAddButton,
+                });
+
+                const targetStatus = `sensor.${env}_alarm_${nextId}_status`;
+                const targetSwitch = `switch.${env}_alarm_${nextId}`;
+                let created = false;
+                for (let i = 0; i < 12; i += 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 150));
+                  const currentHass = getHass();
+                  if (currentHass?.states[targetStatus] || currentHass?.states[targetSwitch]) {
+                    created = true;
+                    break;
                   }
+                }
 
-                  if (!nextId) {
-                    helpers.toastMessage('No free alarm ID available');
-                    return;
-                  }
+                if (!created) {
+                  helpers.toastMessage(`Alarm ${nextId} was not created`);
+                  return;
+                }
 
-                  await hass.callService('button', 'press', {
-                    entity_id: `button.${env}_manager_add_alarm`,
-                  });
-
-                  await new Promise((resolve) => setTimeout(resolve, 250));
-
-                  await hass.callService('input_text', 'set_value', {
-                    entity_id: 'input_text.snoozefest_alarm_id',
-                    value: String(nextId),
-                  });
-                })();
-              ]]]
+                await getHass().callService('input_text', 'set_value', {
+                  entity_id: 'input_text.snoozefest_alarm_id',
+                  value: String(nextId),
+                });
+              })();
+            ]]]

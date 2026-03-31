@@ -5,11 +5,13 @@ visibility:
 type: vertical-stack
 cards:
   - type: heading
-    heading: Timers
+    heading: Timers (Read-Only Time Picker Test)
   - type: custom:auto-entities
     card:
       type: vertical-stack
     card_param: cards
+    sort:
+      method: entity_id
     filter:
       include:
         - entity_id: /^sensor\.[a-z0-9_]+_timer_\d+_remaining$/
@@ -20,18 +22,18 @@ cards:
             read_only: true
             show_days: true
             show_seconds: true
-            separator_mode: units
             autosave: false
             color: var(--primary-text-color)
-            font_size: 2.5
-            suffix_font_size: 0.5em
+            font_size: 2
+            separator_mode: units
+            suffix_font_size: 0.45em
             suffix_opacity: 0.5
-            suffix_padding: 10px 0px 0px 0px
+            suffix_padding: 8px 0px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
-            padding: 26px
+            padding: 12px 14px
             input_width: 1.2em
-            show_steppers: true
+            show_steppers: false
             stepper_hit_height: 1.25em
             stepper_color: var(--secondary-text-color)
             stepper_opacity: 0.5
@@ -41,17 +43,16 @@ cards:
             stepper_size: 0.8em
             stepper_stroke: 0.12em
             pending_write_ms: 700
+            tap_sets_timer_id: input_text.snoozefest_timer_id
+            hold_dismisses: true
             status_color_target: input
-            status_color_default: rgba(1,1,1,0.1)
-            status_color_inactive: rgba(1,1,1,0.1)
+            status_color_default: rgba(1,1,1,0.0)
             status_color_active: rgba(40,167,69,0.18)
             status_color_paused: rgba(255,193,7,0.18)
             status_color_ringing: rgba(220,53,69,0.18)
             input_border_radius: 0.2em
             input_padding: 0.4em
             content_justify: center
-            tap_sets_timer_id: input_text.snoozefest_timer_id
-            hold_dismisses: true
   - type: grid
     columns: 3
     square: false
@@ -68,17 +69,10 @@ cards:
         update_timer: 2
         name: |
           [[[ 
-            const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
-            const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+            const rawEnv = states['input_text.snoozefest_env']?.state;
+            const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
               ? rawEnv
-              : '';
-            const discoveredEnvs = Object.keys(states)
-              .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-              .filter((m) => !!m)
-              .map((m) => m[1]);
-            const env = helperEnv && states[`button.${helperEnv}_manager_add_timer`]
-              ? helperEnv
-              : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+              : 'snoozefest';
             const usedIds = Object.keys(states)
               .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
               .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
@@ -87,17 +81,10 @@ cards:
           ]]]
         label: |
           [[[ 
-            const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
-            const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+            const rawEnv = states['input_text.snoozefest_env']?.state;
+            const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
               ? rawEnv
-              : '';
-            const discoveredEnvs = Object.keys(states)
-              .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-              .filter((m) => !!m)
-              .map((m) => m[1]);
-            const env = helperEnv && states[`button.${helperEnv}_manager_add_timer`]
-              ? helperEnv
-              : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+              : 'snoozefest';
             const usedIds = Object.keys(states)
               .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
               .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
@@ -110,17 +97,10 @@ cards:
             - min-height: 80px
             - background: |
                 [[[ 
-                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
-                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
                     ? rawEnv
-                    : '';
-                  const discoveredEnvs = Object.keys(states)
-                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-                    .filter((m) => !!m)
-                    .map((m) => m[1]);
-                  const env = helperEnv && states[`button.${helperEnv}_manager_add_timer`]
-                    ? helperEnv
-                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                    : 'snoozefest';
                   const usedIds = Object.keys(states)
                     .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
                     .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
@@ -131,17 +111,10 @@ cards:
                 ]]]
             - opacity: |
                 [[[ 
-                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
-                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
                     ? rawEnv
-                    : '';
-                  const discoveredEnvs = Object.keys(states)
-                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-                    .filter((m) => !!m)
-                    .map((m) => m[1]);
-                  const env = helperEnv && states[`button.${helperEnv}_manager_add_timer`]
-                    ? helperEnv
-                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                    : 'snoozefest';
                   const usedIds = Object.keys(states)
                     .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
                     .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
@@ -151,17 +124,10 @@ cards:
           name:
             - color: |
                 [[[ 
-                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
-                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
                     ? rawEnv
-                    : '';
-                  const discoveredEnvs = Object.keys(states)
-                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-                    .filter((m) => !!m)
-                    .map((m) => m[1]);
-                  const env = helperEnv && states[`button.${helperEnv}_manager_add_timer`]
-                    ? helperEnv
-                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                    : 'snoozefest';
                   const usedIds = Object.keys(states)
                     .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
                     .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
@@ -170,17 +136,10 @@ cards:
                 ]]]
             - font-size: |
                 [[[ 
-                  const rawEnv = String(states['input_text.snoozefest_env']?.state || '').trim();
-                  const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                  const rawEnv = states['input_text.snoozefest_env']?.state;
+                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
                     ? rawEnv
-                    : '';
-                  const discoveredEnvs = Object.keys(states)
-                    .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-                    .filter((m) => !!m)
-                    .map((m) => m[1]);
-                  const env = helperEnv && states[`button.${helperEnv}_manager_add_timer`]
-                    ? helperEnv
-                    : (discoveredEnvs[0] || helperEnv || 'snoozefest');
+                    : 'snoozefest';
                   const usedIds = Object.keys(states)
                     .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
                     .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
@@ -199,24 +158,10 @@ cards:
             [[[ 
               (async () => {
                 const hass = this._hass;
-                const getHass = () => this._hass || hass;
-                const rawEnv = String(hass.states['input_text.snoozefest_env']?.state || '').trim();
-                const helperEnv = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
+                const rawEnv = hass.states['input_text.snoozefest_env']?.state;
+                const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
                   ? rawEnv
-                  : '';
-                const discoveredEnvs = Object.keys(hass.states)
-                  .map((eid) => eid.match(/^button\.([a-z0-9_]+)_manager_add_timer$/))
-                  .filter((m) => !!m)
-                  .map((m) => m[1]);
-                const env = helperEnv && hass.states[`button.${helperEnv}_manager_add_timer`]
-                  ? helperEnv
-                  : (discoveredEnvs[0] || helperEnv || 'snoozefest');
-                const managerAddButton = `button.${env}_manager_add_timer`;
-
-                if (!hass.states[managerAddButton]) {
-                  helpers.toastMessage(`Add button not found for prefix: ${env}`);
-                  return;
-                }
+                  : 'snoozefest';
 
                 const usedIds = Object.keys(hass.states)
                   .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
@@ -242,26 +187,12 @@ cards:
                 }
 
                 await hass.callService('button', 'press', {
-                  entity_id: managerAddButton,
+                  entity_id: `button.${env}_manager_add_timer`,
                 });
 
-                const targetStatus = `sensor.${env}_timer_${nextId}_status`;
-                let created = false;
-                for (let i = 0; i < 12; i += 1) {
-                  await new Promise((resolve) => setTimeout(resolve, 150));
-                  const currentHass = getHass();
-                  if (currentHass?.states[targetStatus]) {
-                    created = true;
-                    break;
-                  }
-                }
+                await new Promise((resolve) => setTimeout(resolve, 250));
 
-                if (!created) {
-                  helpers.toastMessage(`Timer ${nextId} was not created`);
-                  return;
-                }
-
-                await getHass().callService('input_text', 'set_value', {
+                await hass.callService('input_text', 'set_value', {
                   entity_id: 'input_text.snoozefest_timer_id',
                   value: String(nextId),
                 });

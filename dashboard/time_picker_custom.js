@@ -235,6 +235,14 @@ const version = '0.3.8-custom';
 					resolvedDisplayEntity = durationEntity;
 				}
 			}
+			if (this.config.read_only && /^sensor\..+_alarm_\d+_remaining$/.test(resolvedDisplayEntity || '')) {
+				const statusEntity = resolvedDisplayEntity.replace(/_remaining$/, '_status');
+				const timeEntity = resolvedDisplayEntity.replace(/^sensor\./, 'text.').replace(/_remaining$/, '_time');
+				const status = String(hass.states[statusEntity]?.state || '').toLowerCase();
+				if (status !== 'snoozed' && hass.states[timeEntity]) {
+					resolvedDisplayEntity = timeEntity;
+				}
+			}
 			this.stateObj = hass.states[resolvedDisplayEntity] || null;
 			if (!this.stateObj) {
 				return;
@@ -244,15 +252,16 @@ const version = '0.3.8-custom';
 
 		_deriveTimerBase() {
 			const d = String(this.config?.display_entity || '');
-			const m = d.match(/^sensor\.(.+_timer_\d+)_remaining(?:_friendly)?$/) ||
-			          d.match(/^(?:text|input_text)\.(.+_timer_\d+)_duration$/);
+			const m = d.match(/^sensor\.(.+_(?:timer|alarm)_\d+)_remaining(?:_friendly)?$/) ||
+			          d.match(/^(?:text|input_text)\.(.+_timer_\d+)_duration$/) ||
+			          d.match(/^(?:text|input_text)\.(.+_alarm_\d+)_time$/);
 			return m ? m[1] : null;
 		}
 
 		_deriveTimerId() {
 			const base = this._deriveTimerBase();
 			if (!base) return null;
-			const m = base.match(/_timer_(\d+)$/);
+			const m = base.match(/_(?:timer|alarm)_(\d+)$/);
 			return m ? m[1] : null;
 		}
 
@@ -339,11 +348,20 @@ const version = '0.3.8-custom';
 			if (/^sensor\..+_timer_\d+_remaining$/.test(displayEntity)) {
 				return displayEntity.replace(/_remaining$/, '_status');
 			}
+			if (/^sensor\..+_alarm_\d+_remaining$/.test(displayEntity)) {
+				return displayEntity.replace(/_remaining$/, '_status');
+			}
 			if (/^sensor\..+_timer_\d+_remaining_friendly$/.test(displayEntity)) {
+				return displayEntity.replace(/_remaining_friendly$/, '_status');
+			}
+			if (/^sensor\..+_alarm_\d+_remaining_friendly$/.test(displayEntity)) {
 				return displayEntity.replace(/_remaining_friendly$/, '_status');
 			}
 			if (/^(text|input_text)\..+_timer_\d+_duration$/.test(displayEntity)) {
 				return displayEntity.replace(/^(text|input_text)\./, 'sensor.').replace(/_duration$/, '_status');
+			}
+			if (/^(text|input_text)\..+_alarm_\d+_time$/.test(displayEntity)) {
+				return displayEntity.replace(/^(text|input_text)\./, 'sensor.').replace(/_time$/, '_status');
 			}
 
 			return null;
