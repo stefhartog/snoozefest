@@ -193,13 +193,14 @@ Each alarm device publishes the following sensors (prefix controls ordering in H
 
 ## Dashboard cards
 
-Three ready-to-use HA dashboard YAML files are included in the project root:
+Dashboard YAML files and the custom time picker card are now grouped under `dashboard/`:
 
 | File | Purpose |
 |---|---|
-| `ha_dashboard_alarms_simple_auto_list_card.yaml` | Auto-list of all alarm entities |
-| `ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities rendered with `custom:snoozefest-time-picker-card` rows |
-| `ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
-| `ha_dashboard_timer_detail_popup_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
+| `dashboard/ha_dashboard_alarms_simple_auto_list_card.yaml` | Auto-list of all alarm entities |
+| `dashboard/ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities rendered with `custom:snoozefest-time-picker-card` rows |
+| `dashboard/ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
+| `dashboard/ha_dashboard_timer_detail_popup_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
+| `dashboard/time_picker_custom.js` | Custom Lovelace card powering the time picker UI |
 
 For future UI consolidation, helper-removal planning, and JS card migration notes, see `TIMER_UI_ROADMAP.md`.

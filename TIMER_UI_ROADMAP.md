@@ -109,18 +109,18 @@ Interim compatibility:
 
 ## Naming Cleanup Reminder
 
-- Rename `time_picker_custom.js` during the JS-card migration phase.
+- Rename `dashboard/time_picker_custom.js` during the JS-card migration phase.
 - Current name is historical; the file now contains broader timer UI behavior, not only time picking.
 - Suggested target names: `snoozefest_timer_card.js` or `snoozefest_timer_ui_card.js`.
 - For smooth upgrades, keep a temporary compatibility alias (or duplicate registration) so existing dashboards do not break immediately.
 
 ## Multiline Input Integration Plan
 
-- Incorporate the customized `input_text.js` card as a shared text-input primitive in the future consolidated UI layer.
+- Incorporate the customized `dashboard/input_text.js` card as a shared text-input primitive in the future consolidated UI layer.
 - Reuse its validated text editing behavior (autosave, min/max length checks, feedback messaging) for alarm/timer labels.
 - Keep one styling/config surface for text input across alarm and timer detail views to avoid drift.
 - During migration, continue registering `lovelace-multiline-text-input-card` for backward compatibility.
-- After consolidated cards are stable, deprecate direct dashboard dependency on `input_text.js` in favor of the new unified card bundle.
+- After consolidated cards are stable, deprecate direct dashboard dependency on `dashboard/input_text.js` in favor of the new unified card bundle.
 
 ## Minimal Unified Timer Card Contract (Draft)
 

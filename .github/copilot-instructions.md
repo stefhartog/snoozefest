@@ -69,10 +69,10 @@ Alarm per-device sensors use a numbered-prefix naming scheme (controls ordering 
 
 Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
 
-### Dashboard cards (root YAML files)
-- `ha_dashboard_alarms_simple_auto_list_card.yaml` — auto-entities list of all alarms
-- `ha_dashboard_timers_auto_list_card.yaml` — auto-entities list of all timers using `custom:snoozefest-time-picker-card` rows
-- `ha_dashboard_alarm_detail_popup_card.yaml` — single alarm detail popup card
+### Dashboard assets (`dashboard/`)
+- `dashboard/ha_dashboard_alarms_simple_auto_list_card.yaml` — auto-entities list of all alarms
+- `dashboard/ha_dashboard_timers_auto_list_card.yaml` — auto-entities list of all timers using `custom:snoozefest-time-picker-card` rows
+- `dashboard/ha_dashboard_alarm_detail_popup_card.yaml` — single alarm detail popup card
   - Uses `custom:config-template-card`; `vars[0]` holds the alarm ID string
   - All entity IDs are hard-coded to the `snoozefest_*` prefix
   - **KNOWN BROKEN**: Using `vars[1]` as an MQTT prefix variable breaks this card when
@@ -82,10 +82,10 @@ Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
     from a `input_text.snoozefest_env` HA entity at runtime.
 
 ### Timer detail popup card
-- `ha_dashboard_timer_detail_popup_card.yaml` currently uses `custom:config-template-card` + conditionals.
+- `dashboard/ha_dashboard_timer_detail_popup_card.yaml` currently uses `custom:config-template-card` + conditionals.
 - Keep changes conservative: avoid aggressive inline JS templating refactors in this YAML card; prior attempts caused non-rendering states.
 - Prefer roadmap-driven consolidation into dedicated JS cards (`TIMER_UI_ROADMAP.md`) rather than forcing complex logic into YAML.
 
 ### Custom card naming note
-- `time_picker_custom.js` has grown beyond a pure time picker.
+- `dashboard/time_picker_custom.js` has grown beyond a pure time picker.
 - Plan naming cleanup during JS-card migration (with compatibility alias to avoid breaking existing dashboards).
