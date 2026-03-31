@@ -1,12 +1,11 @@
 {
   "folders": [
     {
-      "name": "REMOTE: Home Assistant",
-      "path": "C:\\Users\\stefh\\Mountain Duck\\be2d15ee-e07c-4c8b-8b58-f17ab6e6add1\\www"
-    },
-    {
       "name": "LOCAL: Workdir",
       "path": "C:\\Users\\Stefh\\snoozefest"
+    },
+    {
+      "path": "../ha-addons"
     }
   ],
   "settings": {}
