@@ -1292,22 +1292,6 @@ class Daemon:
                 "icon": "mdi:calendar-today",
                 "device": self._alarm_device(alarm, alarm_id),
             }
-            recurring_payload = {
-                "name": "05 Recurring",
-                "unique_id": self._alarm_recurring_object_id(alarm_id),
-                "object_id": self._alarm_recurring_object_id(alarm_id),
-                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
-                "payload_available": "true",
-                "payload_not_available": "false",
-                "state_topic": self._alarm_recurring_state_topic(alarm_id),
-                "command_topic": self._alarm_recurring_command_topic(alarm_id),
-                "payload_on": "ON",
-                "payload_off": "OFF",
-                "state_on": "ON",
-                "state_off": "OFF",
-                "icon": "mdi:calendar-sync",
-                "device": self._alarm_device(alarm, alarm_id),
-            }
             label_payload = {
                 "name": "01 Label",
                 "unique_id": self._alarm_label_object_id(alarm_id),
@@ -1362,7 +1346,8 @@ class Daemon:
             self._mqtt.publish(self._alarm_remaining_friendly_discovery_topic(alarm_id), remaining_friendly_payload, retain=True)
             self._mqtt.publish(self._alarm_next_day_discovery_topic(alarm_id), next_day_payload, retain=True)
             self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
-            self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), recurring_payload, retain=True)
+            # Recurring is derived from weekday selection and is no longer user-configurable.
+            self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), label_payload, retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_legacy_time(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_time_picker(alarm_id), "", retain=True)
@@ -1382,7 +1367,7 @@ class Daemon:
                 str(alarm.get("status_normalized") or self._normalized_alarm_status_fallback(alarm, str(alarm.get("status", "inactive")))),
                 retain=True,
             )
-            recurring_value = "ON" if bool(alarm.get("recurring", False)) else "OFF"
+            recurring_value = "ON" if bool(alarm.get("weekdays", [])) else "OFF"
             self._mqtt.publish(self._alarm_recurring_state_topic(alarm_id), recurring_value, retain=True)
             self._mqtt.publish(self._alarm_kind_state_topic_legacy(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_state_topic(alarm_id), str(alarm.get("label", "Alarm")), retain=True)
@@ -1420,7 +1405,6 @@ class Daemon:
             self._mqtt.publish(self._alarm_remaining_friendly_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_next_day_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_kind_discovery_topic_legacy(alarm_id), "", retain=True)
-            self._mqtt.publish(self._alarm_recurring_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_label_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_legacy_time(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_time_discovery_topic_time_picker(alarm_id), "", retain=True)
@@ -1503,7 +1487,7 @@ class Daemon:
         hour, minute = map(int, time_str.split(":", 1))
 
         now_local = now_utc.astimezone(self._tz)
-        recurring = bool(alarm.get("recurring", False))
+        recurring = bool(alarm.get("weekdays") or [])
 
         if not recurring and alarm.get("last_triggered_date") is not None:
             return None
@@ -1838,24 +1822,7 @@ class Daemon:
             return True
 
         if field == "recurring":
-            if isinstance(payload, bool):
-                recurring = payload
-            elif isinstance(payload, str):
-                normalized = payload.strip().upper()
-                if normalized in {"ON", "TRUE", "1"}:
-                    recurring = True
-                elif normalized in {"OFF", "FALSE", "0"}:
-                    recurring = False
-                else:
-                    raise ValueError(f"Unsupported recurring payload: {payload!r}")
-            else:
-                raise TypeError("Alarm recurring payload must be ON/OFF or boolean")
-
-            updated = self._scheduler.set_alarm(alarm_id, recurring=recurring)
-            if updated:
-                self._ack(cmd, True, f"Alarm recurring updated: {alarm_id}")
-            else:
-                self._ack(cmd, False, f"Alarm not found: {alarm_id}")
+            self._ack(cmd, False, "Alarm recurring is derived from weekdays and cannot be set directly")
             return True
 
         return False
@@ -2021,21 +1988,19 @@ class Daemon:
         """Create a new alarm. Payload can include:
         - time: "HH:MM" string (default: now+1min)
         - label: string (default: "")
-        - enabled: bool (default: true when payload is non-empty, else false)
+        - enabled: bool (default: true)
         - temporary: bool (default: false)
-        - recurring: bool (default: false)
-        - weekdays: [0..6] list (default: all days)
+        - weekdays: [0..6] list (default: empty => one-off)
         """
         now_local = datetime.now(self._tz)
         default_time = (now_local + timedelta(minutes=1)).replace(second=0, microsecond=0).strftime("%H:%M")
 
         time_str = payload.get("time", default_time)
         label = payload.get("label", "")
-        enabled = bool(payload.get("enabled", bool(payload)))
+        enabled = bool(payload.get("enabled", True))
         temporary = bool(payload.get("temporary", False))
-        recurring = bool(payload.get("recurring", False))
         weekdays_raw = payload.get("weekdays")
-        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else [0, 1, 2, 3, 4, 5, 6]
+        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else []
         if not all(0 <= d <= 6 for d in weekdays):
             raise ValueError("weekdays must be integers 0-6")
 
@@ -2044,12 +2009,11 @@ class Daemon:
             str(label),
             enabled=enabled,
             temporary=temporary,
-            recurring=recurring,
             weekdays=weekdays,
         )
         status = "enabled" if enabled else "disabled"
         temp_suffix = " temporary" if temporary else ""
-        kind = "Recurring" if recurring else "Alarm"
+        kind = "Recurring alarm" if weekdays else "Alarm"
         self._ack("alarm/new", True, f"{kind}{temp_suffix} created {status}: {alarm.id}")
 
     def _cmd_alarm_set(self, payload: dict) -> None:
@@ -2064,23 +2028,21 @@ class Daemon:
 
         weekdays_raw = payload.get("weekdays")
         temporary = bool(payload.get("temporary", False))
-        recurring = bool(payload.get("recurring", weekdays_raw is not None))
-        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else [0, 1, 2, 3, 4, 5, 6]
+        weekdays = [int(d) for d in weekdays_raw] if weekdays_raw is not None else []
         if not all(0 <= d <= 6 for d in weekdays):
             raise ValueError("weekdays must be integers 0-6")
 
         alarm = self._scheduler.add_alarm(
             time_str,
             label,
-            enabled=False,
+            enabled=True,
             temporary=temporary,
-            recurring=recurring,
             weekdays=weekdays,
         )
-        if recurring:
-            self._ack("alarm/set", True, f"Recurring alarm created disabled: {alarm.id}")
+        if weekdays:
+            self._ack("alarm/set", True, f"Recurring alarm created enabled: {alarm.id}")
         else:
-            self._ack("alarm/set", True, f"One-off alarm created disabled: {alarm.id}")
+            self._ack("alarm/set", True, f"One-off alarm created enabled: {alarm.id}")
 
     def _cmd_alarm_update(self, payload: dict) -> None:
         alarm_id = str(payload["id"])
@@ -2090,7 +2052,6 @@ class Daemon:
             weekdays=payload.get("weekdays"),
             label=payload.get("label"),
             enabled=payload.get("enabled"),
-            recurring=payload.get("recurring"),
         )
         if updated:
             self._ack("alarm/update", True, f"Alarm updated: {alarm_id}")

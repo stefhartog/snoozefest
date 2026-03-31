@@ -60,10 +60,18 @@ class Scheduler:
     def _normalize_weekdays(weekdays: List[int]) -> List[int]:
         return sorted({int(day) for day in weekdays if 0 <= int(day) <= 6})
 
+    @staticmethod
+    def _is_recurring_weekdays(weekdays: List[int]) -> bool:
+        return len(Scheduler._normalize_weekdays(weekdays)) > 0
+
+    @staticmethod
+    def _is_recurring_alarm(alarm: Alarm) -> bool:
+        return Scheduler._is_recurring_weekdays(alarm.weekdays)
+
     def _next_alarm_time(self, alarm: Alarm, now_local: datetime, now_utc: datetime) -> Optional[datetime]:
         hour, minute = self._parse_hour_minute(alarm.time)
 
-        if alarm.recurring:
+        if self._is_recurring_alarm(alarm):
             weekdays = self._normalize_weekdays(alarm.weekdays)
             if not weekdays:
                 return None
@@ -113,7 +121,7 @@ class Scheduler:
                     continue
 
                 hour, minute = self._parse_hour_minute(alarm.time)
-                if alarm.recurring:
+                if self._is_recurring_alarm(alarm):
                     weekdays = self._normalize_weekdays(alarm.weekdays)
                     if not weekdays:
                         continue
@@ -172,7 +180,7 @@ class Scheduler:
 
                 if alarm.temporary:
                     state.alarms.remove(alarm)
-                elif alarm.recurring:
+                elif self._is_recurring_alarm(alarm):
                     alarm.status = "active"
                     alarm.enabled = True
                     alarm.last_triggered_date = today_local
@@ -226,9 +234,10 @@ class Scheduler:
     ) -> Alarm:
         normalized_time = self._normalize_time_str(time_str)
         if weekdays is None:
-            normalized_weekdays = [0, 1, 2, 3, 4, 5, 6]
+            normalized_weekdays = [0, 1, 2, 3, 4, 5, 6] if recurring else []
         else:
             normalized_weekdays = self._normalize_weekdays(weekdays)
+        derived_recurring = self._is_recurring_weekdays(normalized_weekdays)
 
         with self._lock:
             alarm = Alarm(
@@ -237,7 +246,7 @@ class Scheduler:
                 label=label,
                 enabled=enabled,
                 temporary=temporary,
-                recurring=bool(recurring),
+                recurring=derived_recurring,
                 weekdays=normalized_weekdays,
                 last_triggered_date=None,
                 status=("active" if enabled else "inactive"),
@@ -322,14 +331,13 @@ class Scheduler:
                         alarm.triggered_at = None
                         alarm.snoozed_until = None
 
-                if "recurring" in kwargs and kwargs["recurring"] is not None:
-                    recurring = bool(kwargs["recurring"])
-                    if recurring != alarm.recurring:
-                        alarm.recurring = recurring
-                        alarm.last_triggered_date = None
-
                 if "weekdays" in kwargs and kwargs["weekdays"] is not None:
                     alarm.weekdays = self._normalize_weekdays(list(kwargs["weekdays"]))
+
+                derived_recurring = self._is_recurring_weekdays(alarm.weekdays)
+                if derived_recurring != alarm.recurring:
+                    alarm.recurring = derived_recurring
+                    alarm.last_triggered_date = None
 
                 self._store.save()
                 found = True
@@ -349,7 +357,6 @@ class Scheduler:
         weekdays: Optional[List[int]] = None,
         label: Optional[str] = None,
         enabled: Optional[bool] = None,
-        recurring: Optional[bool] = None,
     ) -> bool:
         updates: dict[str, object] = {}
         if time is not None:
@@ -360,8 +367,6 @@ class Scheduler:
             updates["label"] = label
         if enabled is not None:
             updates["enabled"] = enabled
-        if recurring is not None:
-            updates["recurring"] = recurring
         if not updates:
             return False
         return self.update_alarm(alarm_id, **updates)
@@ -423,7 +428,7 @@ class Scheduler:
                 dismissed.append(alarm.id)
                 if alarm.temporary:
                     state.alarms.remove(alarm)
-                elif alarm.recurring:
+                elif self._is_recurring_alarm(alarm):
                     alarm.status = "active"
                     alarm.enabled = True
                     alarm.last_triggered_date = today
@@ -448,7 +453,7 @@ class Scheduler:
                             continue
                         if alarm.temporary:
                             state.alarms.remove(alarm)
-                        elif alarm.recurring:
+                        elif self._is_recurring_alarm(alarm):
                             alarm.status = "active"
                             alarm.enabled = True
                             alarm.last_triggered_date = today
@@ -733,7 +738,7 @@ class Scheduler:
             "timezone": dt["timezone"],
             "alarm_id": alarm.id,
             "label": alarm.label,
-            "recurring": alarm.recurring,
+            "recurring": self._is_recurring_alarm(alarm),
         }
 
     def full_state(self) -> dict:
@@ -808,7 +813,7 @@ class Scheduler:
         if not alarm.enabled:
             return ("inactive", "Inactive", "disabled")
 
-        if alarm.recurring and alarm.last_triggered_date == today_local_iso:
+        if self._is_recurring_alarm(alarm) and alarm.last_triggered_date == today_local_iso:
             return ("active", "Active", "dismissed_for_today")
 
         return ("active", "Active", "scheduled")
@@ -830,7 +835,7 @@ class Scheduler:
                 "label": alarm.label,
                 "enabled": alarm.enabled,
                 "temporary": alarm.temporary,
-                "recurring": alarm.recurring,
+                "recurring": self._is_recurring_alarm(alarm),
                 "weekdays": alarm.weekdays,
                 "last_triggered_date": alarm.last_triggered_date,
                 "status": canonical_status,

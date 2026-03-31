@@ -1,7 +1,7 @@
 ((LitElement) => {
 	const html = LitElement.prototype.html;
 	const css = LitElement.prototype.css;
-	const version = '1.0.13-custom';
+	const version = '1.0.14-custom';
 
 	const SUPPORTED_ENTITY_DOMAINS = [
 		'input_text',
@@ -156,6 +156,10 @@
 				this.config.padding != null ? `padding: ${this.config.padding}` : '',
 				this.config.padding_top_bottom != null ? `padding-top: ${this.config.padding_top_bottom}; padding-bottom: ${this.config.padding_top_bottom}` : '',
 				this.config.padding_left_right != null ? `padding-left: ${this.config.padding_left_right}; padding-right: ${this.config.padding_left_right}` : '',
+				this.config.padding_top != null ? `padding-top: ${this.config.padding_top}` : '',
+				this.config.padding_bottom != null ? `padding-bottom: ${this.config.padding_bottom}` : '',
+				this.config.padding_left != null ? `padding-left: ${this.config.padding_left}` : '',
+				this.config.padding_right != null ? `padding-right: ${this.config.padding_right}` : '',
 			].filter(Boolean).join('; ');
 			return this.stateObj ?
 				html`
@@ -548,6 +552,10 @@
 				padding: normalizeCssSize(config.padding),
 				padding_left_right: normalizeCssSize(config.padding_left_right),
 				padding_top_bottom: normalizeCssSize(config.padding_top_bottom),
+				padding_top: normalizeCssSize(config.padding_top),
+				padding_bottom: normalizeCssSize(config.padding_bottom),
+				padding_left: normalizeCssSize(config.padding_left),
+				padding_right: normalizeCssSize(config.padding_right),
 
 				actions: Object.assign({}, actions),
 				buttons: Object.assign({}, buttons, config.buttons),

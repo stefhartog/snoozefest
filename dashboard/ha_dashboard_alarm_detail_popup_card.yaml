@@ -10,11 +10,8 @@ card:
   type: custom:config-template-card
   variables:
     - >-
-      (((states['input_text.snoozefest_env'] &&
-      states['input_text.snoozefest_env'].state &&
-      states['input_text.snoozefest_env'].state !== 'unknown' &&
-      states['input_text.snoozefest_env'].state !== 'unavailable') ?
-      states['input_text.snoozefest_env'].state : 'snoozefest')) + '_alarm_' +
+      (((window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) ||
+      'snoozefest')) + '_alarm_' +
       states['input_text.snoozefest_alarm_id'].state
     - |-
       (function () {
@@ -37,12 +34,10 @@ card:
         return (nextDay ? nextDay + ' at ' : '') + setTime;
       })()
   entities:
-    - input_text.snoozefest_env
     - input_text.snoozefest_alarm_id
     - ${'switch.' + vars[0]}
     - ${'text.' + vars[0] + '_time'}
     - ${'text.' + vars[0] + '_label'}
-    - ${'switch.' + vars[0] + '_recurring'}
     - ${'switch.' + vars[0] + '_weekday_0'}
     - ${'switch.' + vars[0] + '_weekday_1'}
     - ${'switch.' + vars[0] + '_weekday_2'}
@@ -69,11 +64,12 @@ card:
             title: false
             buttons: false
             color: var(--primary-text-color)
-            font_size: 1.2
+            font_size: 1
             card_border: false
-            card_background: transparent
-            padding: 0
-            padding_left_right: 4
+            card_background: false
+            padding: null
+            padding_left: 2
+            padding_top: 4
           - type: custom:button-card
             entity: ${'sensor.' + vars[0] + '_status'}
             show_name: false
@@ -99,15 +95,16 @@ card:
             styles:
               card:
                 - border: none
+                - background: none
                 - box-shadow: none
-                - background: var(--primary-background-color)
-                - padding: 4px
+                - padding: 0px
+                - padding-top: 7px
                 - padding-right: 5px
               state:
                 - align-self: bottom
                 - justify-self: end
                 - font-size: 0.7em
-                - color: var(--primary-text-color)
+                - color: rgba(255,255,255,0.2)
       - type: grid
         columns: 2
         square: false
@@ -151,25 +148,6 @@ card:
               action: toggle
       - type: horizontal-stack
         cards:
-          - type: custom:button-card
-            entity: ${'switch.' + vars[0] + '_recurring'}
-            color_type: color
-            show_name: false
-            icon: mdi:repeat
-            tap_action:
-              action: toggle
-            styles:
-              card:
-                - background: |-
-                    [[[
-                      return entity && entity.state === 'on'
-                        ? 'var(--accent-color)'
-                        : '';
-                    ]]]
-              name:
-                - color: var(--primary-text-color)
-              icon:
-                - color: var(--primary-text-color)
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_0'}
             color_type: card
@@ -297,10 +275,17 @@ card:
             icon: mdi:delete
             entity: ${'button.' + vars[0] + '_remove'}
             tap_action:
-              action: call-service
-              service: button.press
-              data:
-                entity_id: ${'button.' + vars[0] + '_remove'}
+              action: multi-actions
+              actions:
+                - action: call-service
+                  service: button.press
+                  data:
+                    entity_id: ${'button.' + vars[0] + '_remove'}
+                - action: call-service
+                  service: input_text.set_value
+                  data:
+                    entity_id: input_text.snoozefest_alarm_id
+                    value: ""
             styles:
               name:
                 - color: var(--primary-text-color)

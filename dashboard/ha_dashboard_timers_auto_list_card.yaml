@@ -1,58 +1,70 @@
 visibility:
   - condition: state
-    entity: input_text.snoozefest_timer_id
+    entity: input_text.snoozefest_alarm_id
     state: ""
 type: vertical-stack
 cards:
   - type: heading
-    heading: Timers (Read-Only Time Picker Test)
+    heading: Alarms
   - type: custom:auto-entities
     card:
       type: vertical-stack
     card_param: cards
-    sort:
-      method: entity_id
     filter:
       include:
-        - entity_id: /^sensor\.[a-z0-9_]+_timer_\d+_remaining$/
+        - entity_id: /^sensor\.[a-z0-9_]+_alarm_\d+_remaining$/
           options:
             type: custom:snoozefest-time-picker-card
-            entity: input_text.snoozefest_timer_id
+            entity: input_text.snoozefest_alarm_id
             display_entity: this.entity_id
+            mqtt_prefix: snoozefest
             read_only: true
-            show_days: true
-            show_seconds: true
+            show_days: false
+            show_seconds: false
+            separator_mode: colon
             autosave: false
             color: var(--primary-text-color)
-            font_size: 2
-            separator_mode: units
-            suffix_font_size: 0.45em
+            font_size: 2.5
+            suffix_font_size: 0.5em
             suffix_opacity: 0.5
-            suffix_padding: 8px 0px 0px 0px
+            suffix_padding: 0px 0px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
-            padding: 12px 14px
+            padding: 26px 26px
             input_width: 1.2em
             show_steppers: false
-            stepper_hit_height: 1.25em
-            stepper_color: var(--secondary-text-color)
-            stepper_opacity: 0.5
-            stepper_active_opacity: 0.9
-            stepper_input_pad_y: 0em
-            stepper_offset: 1.4em
-            stepper_size: 0.8em
-            stepper_stroke: 0.12em
             pending_write_ms: 700
-            tap_sets_timer_id: input_text.snoozefest_timer_id
-            hold_dismisses: true
-            status_color_target: input
-            status_color_default: rgba(1,1,1,0.0)
-            status_color_active: rgba(40,167,69,0.18)
-            status_color_paused: rgba(255,193,7,0.18)
-            status_color_ringing: rgba(220,53,69,0.18)
+            status_color_target: card
+            status_color_default: var(--secondary-back-color)
+            status_color_active: rgba(43, 71, 143,0.3)
+            status_color_paused: rgba(138, 128, 51,0.3)
+            status_color_ringing: rgba(145, 50, 44,0.3)
             input_border_radius: 0.2em
             input_padding: 0.4em
-            content_justify: center
+            content_justify: left
+            tap_sets_timer_id: input_text.snoozefest_alarm_id
+            hold_dismisses: true
+            secondary_mode: weekday_smart
+            secondary_anchor: card
+            secondary_position: topleft
+            secondary_align: center
+            secondary_offset_x: 14px
+            secondary_offset_y: "-11px"
+            secondary_font_size: 0.4em
+            secondary_opacity: "0.4"
+            secondary_button: true
+            secondary_button_icon_on: mdi:toggle-switch-outline
+            secondary_button_icon_off: mdi:toggle-switch-off-outline
+            secondary_button_icon_size: 50px
+            secondary_button_icon_on_color: var(--secondary-text-color)
+            secondary_button_icon_off_color: var(--secondary-text-color)
+            secondary_button_icon_on_opacity: "1"
+            secondary_button_icon_off_opacity: "0.3"
+            secondary_button_anchor: card
+            secondary_button_position: right
+            secondary_button_z_index: 2
+            secondary_button_click_action: toggle_switch
+            secondary_button_click_stop_propagation: true
   - type: grid
     columns: 3
     square: false
@@ -69,27 +81,29 @@ cards:
         update_timer: 2
         name: |
           [[[ 
-            const rawEnv = states['input_text.snoozefest_env']?.state;
-            const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-              ? rawEnv
-              : 'snoozefest';
-            const usedIds = Object.keys(states)
-              .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-              .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+            const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+            const statusIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+            const switchIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+            const usedIds = [...new Set([...statusIds, ...switchIds])]
               .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
             return usedIds.length >= 12 ? 'Max' : '+';
           ]]]
         label: |
           [[[ 
-            const rawEnv = states['input_text.snoozefest_env']?.state;
-            const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-              ? rawEnv
-              : 'snoozefest';
-            const usedIds = Object.keys(states)
-              .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-              .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+            const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+            const statusIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+            const switchIds = Object.keys(states)
+              .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+              .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+            const usedIds = [...new Set([...statusIds, ...switchIds])]
               .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-            return usedIds.length >= 12 ? 'Maximum timers reached (12)' : '';
+            return usedIds.length >= 12 ? 'Maximum alarms reached (12)' : '';
           ]]]
         color_type: card
         styles:
@@ -97,13 +111,14 @@ cards:
             - min-height: 80px
             - background: |
                 [[[ 
-                  const rawEnv = states['input_text.snoozefest_env']?.state;
-                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                    ? rawEnv
-                    : 'snoozefest';
-                  const usedIds = Object.keys(states)
-                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                  const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
                   return usedIds.length >= 12
                     ? 'color-mix(in srgb, var(--disabled-text-color) 20%, transparent)'
@@ -111,38 +126,41 @@ cards:
                 ]]]
             - opacity: |
                 [[[ 
-                  const rawEnv = states['input_text.snoozefest_env']?.state;
-                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                    ? rawEnv
-                    : 'snoozefest';
-                  const usedIds = Object.keys(states)
-                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                  const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
                   return usedIds.length >= 12 ? '0.65' : '1';
                 ]]]
           name:
             - color: |
                 [[[ 
-                  const rawEnv = states['input_text.snoozefest_env']?.state;
-                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                    ? rawEnv
-                    : 'snoozefest';
-                  const usedIds = Object.keys(states)
-                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                  const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
                   return usedIds.length >= 12 ? 'var(--disabled-text-color)' : 'var(--primary-color)';
                 ]]]
             - font-size: |
                 [[[ 
-                  const rawEnv = states['input_text.snoozefest_env']?.state;
-                  const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                    ? rawEnv
-                    : 'snoozefest';
-                  const usedIds = Object.keys(states)
-                    .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-                    .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                  const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+                  const statusIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                  const switchIds = Object.keys(states)
+                    .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                    .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                  const usedIds = [...new Set([...statusIds, ...switchIds])]
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
                   return usedIds.length >= 12 ? '1.4rem' : '3rem';
                 ]]]
@@ -158,18 +176,26 @@ cards:
             [[[ 
               (async () => {
                 const hass = this._hass;
-                const rawEnv = hass.states['input_text.snoozefest_env']?.state;
-                const env = rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable'
-                  ? rawEnv
-                  : 'snoozefest';
+                const getHass = () => this._hass || hass;
+                const env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+                const managerAddButton = `button.${env}_manager_add_alarm`;
 
-                const usedIds = Object.keys(hass.states)
-                  .filter((eid) => new RegExp(`^sensor\\.${env}_timer_\\d+_status$`).test(eid))
-                  .map((eid) => parseInt(eid.match(/timer_(\d+)_status$/)?.[1] || '', 10))
+                if (!hass.states[managerAddButton]) {
+                  helpers.toastMessage(`Add button not found for prefix: ${env}`);
+                  return;
+                }
+
+                const statusIds = Object.keys(hass.states)
+                  .filter((eid) => new RegExp(`^sensor\\.${env}_alarm_\\d+_status$`).test(eid))
+                  .map((eid) => parseInt(eid.match(/alarm_(\d+)_status$/)?.[1] || '', 10));
+                const switchIds = Object.keys(hass.states)
+                  .filter((eid) => new RegExp(`^switch\\.${env}_alarm_\\d+$`).test(eid))
+                  .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
+                const usedIds = [...new Set([...statusIds, ...switchIds])]
                   .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
 
                 if (usedIds.length >= 12) {
-                  helpers.toastMessage('Maximum timers reached (12)');
+                  helpers.toastMessage('Maximum alarms reached (12)');
                   return;
                 }
 
@@ -182,18 +208,33 @@ cards:
                 }
 
                 if (!nextId) {
-                  helpers.toastMessage('No free timer ID available');
+                  helpers.toastMessage('No free alarm ID available');
                   return;
                 }
 
                 await hass.callService('button', 'press', {
-                  entity_id: `button.${env}_manager_add_timer`,
+                  entity_id: managerAddButton,
                 });
 
-                await new Promise((resolve) => setTimeout(resolve, 250));
+                const targetStatus = `sensor.${env}_alarm_${nextId}_status`;
+                const targetSwitch = `switch.${env}_alarm_${nextId}`;
+                let created = false;
+                for (let i = 0; i < 12; i += 1) {
+                  await new Promise((resolve) => setTimeout(resolve, 150));
+                  const currentHass = getHass();
+                  if (currentHass?.states[targetStatus] || currentHass?.states[targetSwitch]) {
+                    created = true;
+                    break;
+                  }
+                }
 
-                await hass.callService('input_text', 'set_value', {
-                  entity_id: 'input_text.snoozefest_timer_id',
+                if (!created) {
+                  helpers.toastMessage(`Alarm ${nextId} was not created`);
+                  return;
+                }
+
+                await getHass().callService('input_text', 'set_value', {
+                  entity_id: 'input_text.snoozefest_alarm_id',
                   value: String(nextId),
                 });
               })();

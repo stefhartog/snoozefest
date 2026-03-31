@@ -18,35 +18,10 @@ card:
           return '';
         }
 
-        var rawEnv = states['input_text.snoozefest_env'] && states['input_text.snoozefest_env'].state
-          ? String(states['input_text.snoozefest_env'].state).trim()
-          : '';
-        var envCandidates = [];
-        if (rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable') {
-          envCandidates.push(rawEnv);
-        }
-        envCandidates.push('snoozefest');
-        envCandidates.push('snoozefest_dev');
-
-        var seen = {};
-        for (var i = 0; i < envCandidates.length; i += 1) {
-          var env = envCandidates[i];
-          if (!env || seen[env]) {
-            continue;
-          }
-          seen[env] = true;
-          var base = env + '_timer_' + rawId;
-          var durationKey = 'text.' + base + '_duration';
-          if (states[durationKey]) {
-            return base;
-          }
-        }
-
-        // Fallback to selected env (or default) even if HA has not cached entity yet.
-        return (rawEnv && rawEnv !== 'unknown' && rawEnv !== 'unavailable' ? rawEnv : 'snoozefest') + '_timer_' + rawId;
+        var env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
+        return env + '_timer_' + rawId;
       })()
   entities:
-    - input_text.snoozefest_env
     - input_text.snoozefest_timer_id
     - ${'text.' + vars[0] + '_duration'}
     - ${'text.' + vars[0] + '_label'}
@@ -76,11 +51,12 @@ card:
             title: false
             buttons: false
             color: var(--primary-text-color)
-            font_size: 1.2
+            font_size: 1
             card_border: false
             card_background: transparent
-            padding: 0
-            padding_left_right: 4
+            padding: null
+            padding_left: 2
+            padding_top: 4
           - type: custom:button-card
             entity: ${'sensor.' + vars[0] + '_status'}
             show_name: false
@@ -119,13 +95,14 @@ card:
                 - border: none
                 - box-shadow: none
                 - background: var(--primary-background-color)
-                - padding: 4px
+                - padding: 0px
+                - padding-top: 7px
                 - padding-right: 5px
               state:
                 - align-self: bottom
                 - justify-self: end
                 - font-size: 0.7em
-                - color: var(--primary-text-color)
+                - color: rgba(255,255,255,0.2)
       - type: conditional
         conditions:
           - entity: ${'sensor.' + vars[0] + '_status'}

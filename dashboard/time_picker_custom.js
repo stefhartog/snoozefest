@@ -1,7 +1,7 @@
 ((LitElement) => {
 	const html = LitElement.prototype.html;
 	const css = LitElement.prototype.css;
-const version = '0.3.8-custom';
+const version = '0.3.16-custom';
 
 	class SnoozefestTimePickerCard extends LitElement {
 		constructor() {
@@ -125,6 +125,71 @@ const version = '0.3.8-custom';
 					user-select: none;
 					opacity: 0.8;
 				}
+				.content {
+					position: relative;
+					display: flex;
+					width: 100%;
+					gap: var(--stpc-secondary-gap, 6px);
+				}
+				.content.anchor-card {
+					display: block;
+				}
+				.main {
+					width: 100%;
+				}
+				.content.anchor-content.pos-left .main,
+				.content.anchor-content.pos-right .main {
+					flex: 1 1 auto;
+					min-width: 0;
+				}
+				.content.pos-below,
+				.content.pos-above {
+					flex-direction: column;
+				}
+				.content.pos-left,
+				.content.pos-right {
+					flex-direction: row;
+					align-items: center;
+				}
+				.secondary {
+					line-height: 1.2;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					min-width: 0;
+					max-width: 100%;
+				}
+				.secondary.icon {
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+					white-space: normal;
+					overflow: visible;
+				}
+				.secondary.icon ha-icon {
+					width: var(--stpc-secondary-icon-size, 1em);
+					height: var(--stpc-secondary-icon-size, 1em);
+					--mdc-icon-size: var(--stpc-secondary-icon-size, 1em);
+				}
+				.secondary-btn {
+					appearance: none;
+					border: 0;
+					background: transparent;
+					color: inherit;
+					font: inherit;
+					line-height: inherit;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
+				}
+				.secondary-btn.icon ha-icon {
+					width: var(--stpc-secondary-btn-icon-size, 1em);
+					height: var(--stpc-secondary-btn-icon-size, 1em);
+					--mdc-icon-size: var(--stpc-secondary-btn-icon-size, 1em);
+				}
+				.secondary.anchor-card {
+					position: absolute;
+				}
 				.missing-entity {
 					color: var(--secondary-text-color);
 					font-size: 0.85em;
@@ -165,6 +230,7 @@ const version = '0.3.8-custom';
 				status_color_target: config.status_color_target != null ? String(config.status_color_target).toLowerCase() : 'input',
 				tap_sets_timer_id: config.tap_sets_timer_id != null ? String(config.tap_sets_timer_id) : null,
 				hold_dismisses: config.hold_dismisses === true,
+				mqtt_prefix: config.mqtt_prefix != null ? String(config.mqtt_prefix).trim() : ((window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest'),
 				read_only: readOnly,
 				title: config.title,
 				autosave: readOnly ? false : (config.autosave !== false),
@@ -202,6 +268,7 @@ const version = '0.3.8-custom';
 				status_color_default: config.status_color_default != null ? String(config.status_color_default) : null,
 				status_color_inactive: config.status_color_inactive != null ? String(config.status_color_inactive) : null,
 				status_color_active: config.status_color_active != null ? String(config.status_color_active) : null,
+				status_color_snoozed: config.status_color_snoozed != null ? String(config.status_color_snoozed) : null,
 				status_color_paused: config.status_color_paused != null ? String(config.status_color_paused) : null,
 				status_color_ringing: config.status_color_ringing != null ? String(config.status_color_ringing) : null,
 				input_padding: config.input_padding != null ? String(config.input_padding) : null,
@@ -214,6 +281,67 @@ const version = '0.3.8-custom';
 				padding_left_right: config.padding_left_right != null ? String(config.padding_left_right) : null,
 				padding_top_bottom: config.padding_top_bottom != null ? String(config.padding_top_bottom) : null,
 				input_width: config.input_width != null ? String(config.input_width) : null,
+				secondary_mode: config.secondary_mode != null ? String(config.secondary_mode).toLowerCase() : 'none',
+				secondary_variant: config.secondary_variant != null ? String(config.secondary_variant).toLowerCase() : 'text',
+				secondary_text: config.secondary_text != null ? String(config.secondary_text) : '',
+				secondary_entity: config.secondary_entity != null ? String(config.secondary_entity) : null,
+				secondary_icon: config.secondary_icon != null ? String(config.secondary_icon) : 'mdi:information-outline',
+				secondary_icon_state_entity: config.secondary_icon_state_entity != null ? String(config.secondary_icon_state_entity) : null,
+				secondary_icon_on: config.secondary_icon_on != null ? String(config.secondary_icon_on) : null,
+				secondary_icon_off: config.secondary_icon_off != null ? String(config.secondary_icon_off) : null,
+				secondary_icon_size: config.secondary_icon_size != null ? String(config.secondary_icon_size) : null,
+				secondary_icon_on_color: config.secondary_icon_on_color != null ? String(config.secondary_icon_on_color) : null,
+				secondary_icon_off_color: config.secondary_icon_off_color != null ? String(config.secondary_icon_off_color) : null,
+				secondary_icon_on_opacity: config.secondary_icon_on_opacity != null ? String(config.secondary_icon_on_opacity) : null,
+				secondary_icon_off_opacity: config.secondary_icon_off_opacity != null ? String(config.secondary_icon_off_opacity) : null,
+				secondary_icon_background: config.secondary_icon_background != null ? String(config.secondary_icon_background) : null,
+				secondary_icon_border_radius: config.secondary_icon_border_radius != null ? String(config.secondary_icon_border_radius) : null,
+				secondary_icon_padding: config.secondary_icon_padding != null ? String(config.secondary_icon_padding) : null,
+				secondary_anchor: config.secondary_anchor != null ? String(config.secondary_anchor).toLowerCase() : 'content',
+				secondary_position: config.secondary_position != null ? String(config.secondary_position).toLowerCase() : 'below',
+				secondary_align: config.secondary_align != null ? String(config.secondary_align).toLowerCase() : null,
+				secondary_gap: config.secondary_gap != null ? String(config.secondary_gap) : null,
+				secondary_font_size: config.secondary_font_size != null ? String(config.secondary_font_size) : null,
+				secondary_color: config.secondary_color != null ? String(config.secondary_color) : null,
+				secondary_opacity: config.secondary_opacity != null ? String(config.secondary_opacity) : null,
+				secondary_font_weight: config.secondary_font_weight != null ? String(config.secondary_font_weight) : null,
+				secondary_padding: config.secondary_padding != null ? String(config.secondary_padding) : null,
+				secondary_offset_x: config.secondary_offset_x != null ? String(config.secondary_offset_x) : null,
+				secondary_offset_y: config.secondary_offset_y != null ? String(config.secondary_offset_y) : null,
+				secondary_z_index: config.secondary_z_index != null ? String(config.secondary_z_index) : null,
+				secondary_pointer_events: config.secondary_pointer_events != null ? String(config.secondary_pointer_events) : 'none',
+				secondary_click_action: config.secondary_click_action != null ? String(config.secondary_click_action).toLowerCase() : 'none',
+				secondary_click_service: config.secondary_click_service != null ? String(config.secondary_click_service) : null,
+				secondary_click_entity: config.secondary_click_entity != null ? String(config.secondary_click_entity) : null,
+				secondary_click_data: config.secondary_click_data != null && typeof config.secondary_click_data === 'object' ? config.secondary_click_data : null,
+				secondary_click_stop_propagation: config.secondary_click_stop_propagation !== false,
+				secondary_aria_label: config.secondary_aria_label != null ? String(config.secondary_aria_label) : null,
+				secondary_button: config.secondary_button === true,
+				secondary_button_icon: config.secondary_button_icon != null ? String(config.secondary_button_icon) : 'mdi:dots-horizontal',
+				secondary_button_icon_state_entity: config.secondary_button_icon_state_entity != null ? String(config.secondary_button_icon_state_entity) : null,
+				secondary_button_icon_on: config.secondary_button_icon_on != null ? String(config.secondary_button_icon_on) : null,
+				secondary_button_icon_off: config.secondary_button_icon_off != null ? String(config.secondary_button_icon_off) : null,
+				secondary_button_icon_size: config.secondary_button_icon_size != null ? String(config.secondary_button_icon_size) : null,
+				secondary_button_icon_on_color: config.secondary_button_icon_on_color != null ? String(config.secondary_button_icon_on_color) : null,
+				secondary_button_icon_off_color: config.secondary_button_icon_off_color != null ? String(config.secondary_button_icon_off_color) : null,
+				secondary_button_icon_on_opacity: config.secondary_button_icon_on_opacity != null ? String(config.secondary_button_icon_on_opacity) : null,
+				secondary_button_icon_off_opacity: config.secondary_button_icon_off_opacity != null ? String(config.secondary_button_icon_off_opacity) : null,
+				secondary_button_icon_background: config.secondary_button_icon_background != null ? String(config.secondary_button_icon_background) : null,
+				secondary_button_icon_border_radius: config.secondary_button_icon_border_radius != null ? String(config.secondary_button_icon_border_radius) : null,
+				secondary_button_icon_padding: config.secondary_button_icon_padding != null ? String(config.secondary_button_icon_padding) : null,
+				secondary_button_anchor: config.secondary_button_anchor != null ? String(config.secondary_button_anchor).toLowerCase() : null,
+				secondary_button_position: config.secondary_button_position != null ? String(config.secondary_button_position).toLowerCase() : null,
+				secondary_button_align: config.secondary_button_align != null ? String(config.secondary_button_align).toLowerCase() : null,
+				secondary_button_offset_x: config.secondary_button_offset_x != null ? String(config.secondary_button_offset_x) : null,
+				secondary_button_offset_y: config.secondary_button_offset_y != null ? String(config.secondary_button_offset_y) : null,
+				secondary_button_z_index: config.secondary_button_z_index != null ? String(config.secondary_button_z_index) : null,
+				secondary_button_pointer_events: config.secondary_button_pointer_events != null ? String(config.secondary_button_pointer_events) : null,
+				secondary_button_click_action: config.secondary_button_click_action != null ? String(config.secondary_button_click_action).toLowerCase() : 'none',
+				secondary_button_click_service: config.secondary_button_click_service != null ? String(config.secondary_button_click_service) : null,
+				secondary_button_click_entity: config.secondary_button_click_entity != null ? String(config.secondary_button_click_entity) : null,
+				secondary_button_click_data: config.secondary_button_click_data != null && typeof config.secondary_button_click_data === 'object' ? config.secondary_button_click_data : null,
+				secondary_button_click_stop_propagation: config.secondary_button_click_stop_propagation !== false,
+				secondary_button_aria_label: config.secondary_button_aria_label != null ? String(config.secondary_button_aria_label) : null,
 			};
 			this.daysText = '';
 			this.hourText = '';
@@ -255,7 +383,31 @@ const version = '0.3.8-custom';
 			const m = d.match(/^sensor\.(.+_(?:timer|alarm)_\d+)_remaining(?:_friendly)?$/) ||
 			          d.match(/^(?:text|input_text)\.(.+_timer_\d+)_duration$/) ||
 			          d.match(/^(?:text|input_text)\.(.+_alarm_\d+)_time$/);
-			return m ? m[1] : null;
+			if (m) return m[1];
+
+			const id = this._deriveSelectedEntityId();
+			const kind = this._deriveSelectedEntityKind();
+			if (!id || !kind) return null;
+			return `${this._getMqttPrefix()}_${kind}_${id}`;
+		}
+
+		_getMqttPrefix() {
+			const configured = String(this.config?.mqtt_prefix || '').trim();
+			return configured || 'snoozefest';
+		}
+
+		_deriveSelectedEntityKind() {
+			const selector = String(this.config?.tap_sets_timer_id || '');
+			if (selector.endsWith('_alarm_id')) return 'alarm';
+			if (selector.endsWith('_timer_id')) return 'timer';
+			return null;
+		}
+
+		_deriveSelectedEntityId() {
+			const selector = String(this.config?.tap_sets_timer_id || '');
+			if (!selector || !this._hass) return null;
+			const rawId = String(this._hass.states[selector]?.state || '').trim();
+			return rawId && rawId !== 'unknown' && rawId !== 'unavailable' ? rawId : null;
 		}
 
 		_deriveTimerId() {
@@ -263,6 +415,14 @@ const version = '0.3.8-custom';
 			if (!base) return null;
 			const m = base.match(/_(?:timer|alarm)_(\d+)$/);
 			return m ? m[1] : null;
+		}
+
+		_getDerivedSwitchEntity() {
+			const base = this._deriveTimerBase();
+			if (!base) {
+				return null;
+			}
+			return `switch.${base}`;
 		}
 
 		_onCardPointerDown(ev) {
@@ -306,6 +466,89 @@ const version = '0.3.8-custom';
 			this._hass.callService('button', 'press', {
 				entity_id: 'button.' + base + '_dismiss',
 			});
+		}
+
+		_secondaryHasClickAction() {
+			return String(this.config?.secondary_click_action || 'none').toLowerCase() !== 'none';
+		}
+
+		_secondaryButtonHasClickAction() {
+			return String(this.config?.secondary_button_click_action || 'none').toLowerCase() !== 'none';
+		}
+
+		_runSecondaryAction(action, service, explicitEntity, payloadObj) {
+			if (!this._hass || !this.config) {
+				return;
+			}
+
+			if (action === 'none') {
+				return;
+			}
+			if (action === 'tap_select') {
+				this._doTap();
+				return;
+			}
+			if (action === 'dismiss') {
+				this._doHold();
+				return;
+			}
+			if (action === 'toggle_switch') {
+				const entity = String(explicitEntity || this._getDerivedSwitchEntity() || '').trim();
+				if (!entity) {
+					return;
+				}
+				this._hass.callService('switch', 'toggle', {
+					entity_id: entity,
+				});
+				return;
+			}
+			if (action === 'service') {
+				const svc = String(service || '').trim();
+				if (!svc || !svc.includes('.')) {
+					return;
+				}
+				const split = svc.split('.');
+				const domain = split[0];
+				const serviceName = split.slice(1).join('.');
+				if (!domain || !serviceName) {
+					return;
+				}
+
+				const payload = payloadObj && typeof payloadObj === 'object'
+					? { ...payloadObj }
+					: {};
+				const entity = String(explicitEntity || '').trim();
+				if (entity) {
+					payload.entity_id = entity;
+				}
+				this._hass.callService(domain, serviceName, payload);
+			}
+		}
+
+		_onSecondaryClick(ev) {
+			if (!this._hass || !this.config) {
+				return;
+			}
+			if (this.config.secondary_click_stop_propagation !== false) {
+				ev.preventDefault();
+				ev.stopPropagation();
+			}
+
+			const action = String(this.config.secondary_click_action || 'none').toLowerCase();
+			this._runSecondaryAction(action, this.config.secondary_click_service, this.config.secondary_click_entity, this.config.secondary_click_data);
+		}
+
+		_onSecondaryButtonClick(ev) {
+			if (!this._hass || !this.config) {
+				return;
+			}
+			if (this.config.secondary_button_click_stop_propagation !== false) {
+				ev.preventDefault();
+				ev.stopPropagation();
+			}
+
+			const action = String(this.config.secondary_button_click_action || 'none').toLowerCase();
+			this._runSecondaryAction(action, this.config.secondary_button_click_service, this.config.secondary_button_click_entity, this.config.secondary_button_click_data);
 		}
 
 		_getCurrentStatus() {
@@ -438,6 +681,321 @@ const version = '0.3.8-custom';
 			].filter(Boolean).join('; ');
 		}
 
+		_getSecondaryPosition() {
+			if (this._getSecondaryAnchor() === 'card') {
+				const pos = String(this.config?.secondary_position || 'center').toLowerCase();
+				if (
+					pos === 'center' ||
+					pos === 'top' ||
+					pos === 'bottom' ||
+					pos === 'left' ||
+					pos === 'right' ||
+					pos === 'topleft' ||
+					pos === 'topright' ||
+					pos === 'bottomleft' ||
+					pos === 'bottomright' ||
+					pos === 'centerleft' ||
+					pos === 'centerright' ||
+					pos === 'topcenter' ||
+					pos === 'bottomcenter'
+				) {
+					return pos;
+				}
+				return 'center';
+			}
+
+			const pos = String(this.config?.secondary_position || 'below').toLowerCase();
+			if (
+				pos === 'above' ||
+				pos === 'below' ||
+				pos === 'left' ||
+				pos === 'right' ||
+				pos === 'top' ||
+				pos === 'bottom' ||
+				pos === 'topleft' ||
+				pos === 'topright' ||
+				pos === 'bottomleft' ||
+				pos === 'bottomright' ||
+				pos === 'topcenter' ||
+				pos === 'bottomcenter' ||
+				pos === 'centerleft' ||
+				pos === 'centerright'
+			) {
+				return pos;
+			}
+			return 'below';
+		}
+
+		_getSecondaryAnchor() {
+			const anchor = String(this.config?.secondary_anchor || 'content').toLowerCase();
+			return anchor === 'card' ? 'card' : 'content';
+		}
+
+		_getSecondaryButtonAnchor() {
+			const raw = this.config?.secondary_button_anchor;
+			if (raw == null || raw === '') {
+				return this._getSecondaryAnchor();
+			}
+			return String(raw).toLowerCase() === 'card' ? 'card' : 'content';
+		}
+
+		_getSecondaryButtonPosition() {
+			const anchor = this._getSecondaryButtonAnchor();
+			const raw = this.config?.secondary_button_position;
+			const fallback = anchor === 'card' ? 'center' : 'right';
+			const pos = String(raw != null && raw !== '' ? raw : fallback).toLowerCase();
+
+			if (anchor === 'card') {
+				if (
+					pos === 'center' ||
+					pos === 'top' ||
+					pos === 'bottom' ||
+					pos === 'left' ||
+					pos === 'right' ||
+					pos === 'topleft' ||
+					pos === 'topright' ||
+					pos === 'bottomleft' ||
+					pos === 'bottomright' ||
+					pos === 'centerleft' ||
+					pos === 'centerright' ||
+					pos === 'topcenter' ||
+					pos === 'bottomcenter'
+				) {
+					return pos;
+				}
+				return 'center';
+			}
+
+			if (
+				pos === 'above' ||
+				pos === 'below' ||
+				pos === 'left' ||
+				pos === 'right' ||
+				pos === 'top' ||
+				pos === 'bottom' ||
+				pos === 'topleft' ||
+				pos === 'topright' ||
+				pos === 'bottomleft' ||
+				pos === 'bottomright' ||
+				pos === 'topcenter' ||
+				pos === 'bottomcenter' ||
+				pos === 'centerleft' ||
+				pos === 'centerright'
+			) {
+				return pos;
+			}
+			return 'right';
+		}
+
+		_getContentFlowPosition(position) {
+			const pos = String(position || '').toLowerCase();
+			if (pos === 'left' || pos === 'centerleft') {
+				return 'left';
+			}
+			if (pos === 'right' || pos === 'centerright') {
+				return 'right';
+			}
+			if (pos === 'above' || pos === 'top' || pos === 'topleft' || pos === 'topcenter' || pos === 'topright') {
+				return 'above';
+			}
+			if (pos === 'below' || pos === 'bottom' || pos === 'bottomleft' || pos === 'bottomcenter' || pos === 'bottomright') {
+				return 'below';
+			}
+			return 'below';
+		}
+
+		_getSecondaryButtonAlign(position) {
+			const align = this.config?.secondary_button_align != null ? String(this.config.secondary_button_align).toLowerCase() : '';
+			if (align === 'left' || align === 'center' || align === 'right') {
+				return align;
+			}
+			if (position === 'right' || position === 'topright' || position === 'bottomright' || position === 'centerright') {
+				return 'right';
+			}
+			if (position === 'left' || position === 'topleft' || position === 'bottomleft' || position === 'centerleft') {
+				return 'left';
+			}
+			return 'center';
+		}
+
+		_getSecondaryAlign() {
+			const align = this.config?.secondary_align != null ? String(this.config.secondary_align).toLowerCase() : '';
+			if (align === 'left' || align === 'center' || align === 'right') {
+				return align;
+			}
+
+			const position = this._getSecondaryPosition();
+			if (position === 'right' || position === 'topright' || position === 'bottomright' || position === 'centerright') {
+				return 'right';
+			}
+			if (position === 'left' || position === 'topleft' || position === 'bottomleft' || position === 'centerleft') {
+				return 'left';
+			}
+			return 'center';
+		}
+
+		_getBinaryState(entityId) {
+			const raw = this._getSecondaryEntityState(entityId).toLowerCase();
+			if (!raw) {
+				return null;
+			}
+			if (raw === 'on' || raw === 'true' || raw === 'active') {
+				return 'on';
+			}
+			if (raw === 'off' || raw === 'false' || raw === 'inactive') {
+				return 'off';
+			}
+			return null;
+		}
+
+		_getResolvedStateIcon(defaultIcon, stateEntity, iconOn, iconOff) {
+			const fallback = String(defaultIcon || '').trim();
+			const state = this._getBinaryState(stateEntity);
+			if (state === 'on') {
+				return String(iconOn || fallback).trim();
+			}
+			if (state === 'off') {
+				return String(iconOff || fallback).trim();
+			}
+			return fallback;
+		}
+
+		_getLargestCssSize(values) {
+			const parsed = (values || [])
+				.map((v) => String(v || '').trim())
+				.filter(Boolean)
+				.map((raw) => {
+					const m = raw.match(/^(-?\d*\.?\d+)([a-z%]+)$/i);
+					if (!m) return null;
+					return {
+						raw,
+						num: parseFloat(m[1]),
+						unit: String(m[2] || '').toLowerCase(),
+					};
+				})
+				.filter(Boolean);
+
+			if (!parsed.length) {
+				return null;
+			}
+
+			const unit = parsed[0].unit;
+			if (!parsed.every((p) => p.unit === unit && Number.isFinite(p.num))) {
+				return null;
+			}
+
+			let max = parsed[0].num;
+			for (const p of parsed) {
+				if (p.num > max) max = p.num;
+			}
+			return `${max}${unit}`;
+		}
+
+		_getSecondaryCardPositionStyle(position) {
+			switch (position) {
+				case 'top':
+				case 'topcenter':
+					return 'top: 0; left: 50%; transform: translateX(-50%)';
+				case 'bottom':
+				case 'bottomcenter':
+					return 'bottom: 0; left: 50%; transform: translateX(-50%)';
+				case 'left':
+				case 'centerleft':
+					return 'left: 0; top: 50%; transform: translateY(-50%)';
+				case 'right':
+				case 'centerright':
+					return 'right: 0; top: 50%; transform: translateY(-50%)';
+				case 'topleft':
+					return 'top: 0; left: 0';
+				case 'topright':
+					return 'top: 0; right: 0';
+				case 'bottomleft':
+					return 'bottom: 0; left: 0';
+				case 'bottomright':
+					return 'bottom: 0; right: 0';
+				case 'center':
+				default:
+					return 'left: 50%; top: 50%; transform: translate(-50%, -50%)';
+			}
+		}
+
+		_getSecondaryEntityState(entityId) {
+			if (!entityId || !this._hass) {
+				return '';
+			}
+			const raw = String(this._hass.states[entityId]?.state || '').trim();
+			if (!raw || raw === 'unknown' || raw === 'unavailable' || raw === 'None') {
+				return '';
+			}
+			return raw;
+		}
+
+		_titleCaseWords(value) {
+			return String(value || '')
+				.split(/\s+/)
+				.filter(Boolean)
+				.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+				.join(' ');
+		}
+
+		_getSecondaryText(currentStatus) {
+			const mode = String(this.config?.secondary_mode || 'none').toLowerCase();
+			if (mode === 'none') {
+				return '';
+			}
+
+			if (mode === 'label') {
+				return String(this.config?.secondary_text || '');
+			}
+
+			if (mode === 'status') {
+				return currentStatus ? this._titleCaseWords(currentStatus) : '';
+			}
+
+			if (mode === 'entity') {
+				return this._getSecondaryEntityState(this.config?.secondary_entity);
+			}
+
+			const base = this._deriveTimerBase();
+			if (!base) {
+				return '';
+			}
+
+			if (mode === 'weekday_smart' || mode === 'smart_weekday') {
+				const alarmMatch = base.match(/_alarm_\d+$/);
+				if (!alarmMatch) {
+					return this._getSecondaryEntityState(`sensor.${base}_next_day`);
+				}
+
+				const selected = [];
+				for (let wd = 0; wd < 7; wd += 1) {
+					const state = this._getSecondaryEntityState(`switch.${base}_weekday_${wd}`).toLowerCase();
+					if (state === 'on' || state === 'true') {
+						selected.push(wd);
+					}
+				}
+
+				if (selected.length === 0 || selected.length === 7) {
+					return this._getSecondaryEntityState(`sensor.${base}_next_day`);
+				}
+
+				const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+				return selected.map((wd) => labels[wd] || '').filter(Boolean).join(' ');
+			}
+
+			if (mode === 'remaining') {
+				const friendlyEntity = `sensor.${base}_remaining_friendly`;
+				const plainEntity = `sensor.${base}_remaining`;
+				return this._getSecondaryEntityState(friendlyEntity) || this._getSecondaryEntityState(plainEntity);
+			}
+
+			if (mode === 'weekday') {
+				return this._getSecondaryEntityState(`sensor.${base}_next_day`);
+			}
+
+			return '';
+		}
+
 		render() {
 			if (!this.stateObj) {
 				return html`
@@ -479,6 +1037,171 @@ const version = '0.3.8-custom';
 			].filter(Boolean).join('; ');
 
 			const suffixStyle = this._getSuffixStyle();
+			const secondaryText = this._getSecondaryText(currentStatus);
+			const secondaryVariant = String(this.config.secondary_variant || 'text').toLowerCase() === 'icon' ? 'icon' : 'text';
+			const secondaryClickable = this._secondaryHasClickAction();
+			const secondaryAnchor = this._getSecondaryAnchor();
+			const secondaryPosition = this._getSecondaryPosition();
+			const secondaryFlowPosition = this._getContentFlowPosition(secondaryPosition);
+			const secondaryAlign = this._getSecondaryAlign();
+			const secondaryStateEntity = this.config.secondary_icon_state_entity || this._getDerivedSwitchEntity();
+			const secondaryIconState = this._getBinaryState(secondaryStateEntity);
+			const secondaryStateColor = secondaryIconState === 'on'
+				? this.config.secondary_icon_on_color
+				: (secondaryIconState === 'off' ? this.config.secondary_icon_off_color : null);
+			const secondaryStateOpacity = secondaryIconState === 'on'
+				? this.config.secondary_icon_on_opacity
+				: (secondaryIconState === 'off' ? this.config.secondary_icon_off_opacity : null);
+			const secondaryIcon = this._getResolvedStateIcon(
+				this.config.secondary_icon || 'mdi:information-outline',
+				secondaryStateEntity,
+				this.config.secondary_icon_on,
+				this.config.secondary_icon_off,
+			) || 'mdi:information-outline';
+			const secondaryStyle = [
+				this.config.secondary_font_size != null ? `font-size: ${this.config.secondary_font_size}` : '',
+				this.config.secondary_color != null ? `color: ${this.config.secondary_color}` : '',
+				this.config.secondary_opacity != null ? `opacity: ${this.config.secondary_opacity}` : '',
+				this.config.secondary_font_weight != null ? `font-weight: ${this.config.secondary_font_weight}` : '',
+				this.config.secondary_padding != null ? `padding: ${this.config.secondary_padding}` : '',
+				this.config.secondary_offset_x != null ? `margin-left: ${this.config.secondary_offset_x}` : '',
+				this.config.secondary_offset_y != null ? `margin-top: ${this.config.secondary_offset_y}` : '',
+				this.config.secondary_z_index != null ? `z-index: ${this.config.secondary_z_index}` : '',
+				secondaryClickable ? 'pointer-events: auto' : (this.config.secondary_pointer_events != null ? `pointer-events: ${this.config.secondary_pointer_events}` : ''),
+				`text-align: ${secondaryAlign}`,
+				secondaryVariant === 'icon' && this.config.secondary_icon_size != null ? `--stpc-secondary-icon-size: ${this.config.secondary_icon_size}` : '',
+				secondaryVariant === 'icon' && secondaryStateColor != null ? `color: ${secondaryStateColor}` : '',
+				secondaryVariant === 'icon' && secondaryStateOpacity != null ? `opacity: ${secondaryStateOpacity}` : '',
+				secondaryVariant === 'icon' && this.config.secondary_icon_background != null ? `background: ${this.config.secondary_icon_background}` : '',
+				secondaryVariant === 'icon' && this.config.secondary_icon_border_radius != null ? `border-radius: ${this.config.secondary_icon_border_radius}` : '',
+				secondaryVariant === 'icon' && this.config.secondary_icon_padding != null ? `padding: ${this.config.secondary_icon_padding}` : '',
+				secondaryAnchor === 'content' && secondaryFlowPosition === 'right' ? 'margin-left: auto' : '',
+				secondaryAnchor === 'content' && secondaryFlowPosition === 'left' ? 'margin-right: auto' : '',
+				secondaryAnchor === 'card' ? this._getSecondaryCardPositionStyle(secondaryPosition) : '',
+			].filter(Boolean).join('; ');
+
+			const secondaryButtonEnabled = this.config.secondary_button === true;
+			const secondaryButtonClickable = this._secondaryButtonHasClickAction();
+			const secondaryButtonAnchor = this._getSecondaryButtonAnchor();
+			const secondaryButtonPosition = this._getSecondaryButtonPosition();
+			const secondaryButtonFlowPosition = this._getContentFlowPosition(secondaryButtonPosition);
+			const secondaryButtonAlign = this._getSecondaryButtonAlign(secondaryButtonPosition);
+			const secondaryButtonStateEntity = this.config.secondary_button_icon_state_entity || this._getDerivedSwitchEntity();
+			const secondaryButtonIconState = this._getBinaryState(secondaryButtonStateEntity);
+			const secondaryButtonStateColor = secondaryButtonIconState === 'on'
+				? this.config.secondary_button_icon_on_color
+				: (secondaryButtonIconState === 'off' ? this.config.secondary_button_icon_off_color : null);
+			const secondaryButtonStateOpacity = secondaryButtonIconState === 'on'
+				? this.config.secondary_button_icon_on_opacity
+				: (secondaryButtonIconState === 'off' ? this.config.secondary_button_icon_off_opacity : null);
+			const secondaryButtonStableSize = this._getLargestCssSize([
+				this.config.secondary_button_icon_size,
+			]);
+			const secondaryButtonIcon = this._getResolvedStateIcon(
+				this.config.secondary_button_icon || 'mdi:dots-horizontal',
+				secondaryButtonStateEntity,
+				this.config.secondary_button_icon_on,
+				this.config.secondary_button_icon_off,
+			) || 'mdi:dots-horizontal';
+			const secondaryButtonStyle = [
+				this.config.secondary_button_icon_size != null ? `--stpc-secondary-btn-icon-size: ${this.config.secondary_button_icon_size}` : '',
+				secondaryButtonStableSize != null ? `width: ${secondaryButtonStableSize}` : '',
+				secondaryButtonStableSize != null ? `height: ${secondaryButtonStableSize}` : '',
+				secondaryButtonStableSize != null ? `min-width: ${secondaryButtonStableSize}` : '',
+				secondaryButtonStableSize != null ? `min-height: ${secondaryButtonStableSize}` : '',
+				secondaryButtonStableSize != null ? 'display: inline-flex' : '',
+				secondaryButtonStableSize != null ? 'align-items: center' : '',
+				secondaryButtonStableSize != null ? 'justify-content: center' : '',
+				this.config.secondary_color != null ? `color: ${this.config.secondary_color}` : '',
+				secondaryButtonStateColor != null ? `color: ${secondaryButtonStateColor}` : '',
+				secondaryButtonStateOpacity != null ? `opacity: ${secondaryButtonStateOpacity}` : '',
+				this.config.secondary_button_icon_background != null ? `background: ${this.config.secondary_button_icon_background}` : '',
+				this.config.secondary_button_icon_border_radius != null ? `border-radius: ${this.config.secondary_button_icon_border_radius}` : '',
+				this.config.secondary_button_icon_padding != null ? `padding: ${this.config.secondary_button_icon_padding}` : '',
+				this.config.secondary_button_offset_x != null ? `margin-left: ${this.config.secondary_button_offset_x}` : '',
+				this.config.secondary_button_offset_y != null ? `margin-top: ${this.config.secondary_button_offset_y}` : '',
+				this.config.secondary_button_z_index != null ? `z-index: ${this.config.secondary_button_z_index}` : '',
+				secondaryButtonClickable ? 'pointer-events: auto' : (this.config.secondary_button_pointer_events != null ? `pointer-events: ${this.config.secondary_button_pointer_events}` : ''),
+				`text-align: ${secondaryButtonAlign}`,
+				secondaryButtonAnchor === 'content' && secondaryButtonFlowPosition === 'right' ? 'margin-left: auto' : '',
+				secondaryButtonAnchor === 'content' && secondaryButtonFlowPosition === 'left' ? 'margin-right: auto' : '',
+				secondaryButtonAnchor === 'card' ? this._getSecondaryCardPositionStyle(secondaryButtonPosition) : '',
+			].filter(Boolean).join('; ');
+
+			const mainMarkup = html`
+				<div class="wrapper">
+					${this._getActiveSegments().map((seg, i) => html`
+						${this.config.separator_mode === 'colon' && i > 0 ? html`<span class="separator" style="${suffixStyle}">${this.config.separator}</span>` : ''}
+						<div class="segment">
+							<div class="${this.config.show_steppers ? 'input-wrap with-steppers' : 'input-wrap'}">
+								<input
+									class="input"
+									inputmode="numeric"
+									maxlength="2"
+									?readonly="${this.config.read_only}"
+									placeholder="${seg.placeholder}"
+									.value="${this[seg.prop]}"
+									@input="${(ev) => this._onInput(seg.key, ev)}"
+									@blur="${this._onCommit}"
+									@keydown="${this._onKeydown}"
+								/>
+							</div>
+							${this.config.show_steppers && interactive ? html`
+								<button
+									type="button"
+									class="stepper-btn up"
+									@pointerdown="${this._onStepperPointerDown}"
+									@click="${() => this._stepSegment(seg.key, 1)}"
+									aria-label="Increase ${seg.key}"
+								>
+									<span class="stepper-glyph"></span>
+								</button>
+								<button
+									type="button"
+									class="stepper-btn down"
+									@pointerdown="${this._onStepperPointerDown}"
+									@click="${() => this._stepSegment(seg.key, -1)}"
+									aria-label="Decrease ${seg.key}"
+								>
+									<span class="stepper-glyph"></span>
+								</button>
+							` : ''}
+						</div>
+						${this.config.separator_mode === 'units' ? html`<span class="separator" style="${suffixStyle}">${seg.unit}</span>` : ''}
+					`)}
+				</div>
+			`;
+
+			const secondaryLabel = this.config.secondary_aria_label || secondaryText || 'Secondary action';
+			const secondaryContent = secondaryVariant === 'icon'
+				? html`<ha-icon icon="${secondaryIcon}"></ha-icon>`
+				: secondaryText;
+			const shouldRenderSecondary = secondaryVariant === 'icon' ? Boolean(secondaryIcon) : Boolean(secondaryText);
+			const secondaryMarkup = shouldRenderSecondary
+				? (secondaryClickable
+					? html`<button type="button" class="secondary secondary-btn ${secondaryVariant} anchor-${secondaryAnchor}" style="${secondaryStyle}" title="${secondaryText || secondaryLabel}" aria-label="${secondaryLabel}" @click="${this._onSecondaryClick}">${secondaryContent}</button>`
+					: html`<div class="secondary ${secondaryVariant} anchor-${secondaryAnchor}" style="${secondaryStyle}" title="${secondaryText || secondaryLabel}">${secondaryContent}</div>`)
+				: '';
+
+			const secondaryButtonShouldRender = secondaryButtonEnabled && Boolean(secondaryButtonIcon);
+			const secondaryButtonLabel = this.config.secondary_button_aria_label || 'Secondary button action';
+			const secondaryButtonMarkup = secondaryButtonShouldRender
+				? html`<button type="button" class="secondary secondary-btn icon anchor-${secondaryButtonAnchor}" style="${secondaryButtonStyle}" title="${secondaryButtonLabel}" aria-label="${secondaryButtonLabel}" @click="${this._onSecondaryButtonClick}"><ha-icon icon="${secondaryButtonIcon}"></ha-icon></button>`
+				: '';
+
+			let contentFlowPosition = 'below';
+			if (secondaryAnchor === 'content' && shouldRenderSecondary) {
+				contentFlowPosition = secondaryFlowPosition;
+			} else if (secondaryButtonAnchor === 'content' && secondaryButtonShouldRender) {
+				contentFlowPosition = secondaryButtonFlowPosition;
+			}
+
+			const contentStyle = [
+				this.config.secondary_gap != null ? `--stpc-secondary-gap: ${this.config.secondary_gap}` : '',
+				secondaryAnchor === 'content' && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && secondaryAlign === 'left' ? 'align-items: flex-start' : '',
+				secondaryAnchor === 'content' && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && secondaryAlign === 'center' ? 'align-items: center' : '',
+				secondaryAnchor === 'content' && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && secondaryAlign === 'right' ? 'align-items: flex-end' : '',
+			].filter(Boolean).join('; ');
 
 			return html`
 				<ha-card
@@ -490,46 +1213,14 @@ const version = '0.3.8-custom';
 					@pointercancel="${this._onCardPointerCancel}"
 				>
 					${this.config.title ? html`<div class="card-header">${this.config.title}</div>` : ''}
-					<div class="wrapper">
-						${this._getActiveSegments().map((seg, i) => html`
-							${this.config.separator_mode === 'colon' && i > 0 ? html`<span class="separator" style="${suffixStyle}">${this.config.separator}</span>` : ''}
-							<div class="segment">
-								<div class="${this.config.show_steppers ? 'input-wrap with-steppers' : 'input-wrap'}">
-									<input
-										class="input"
-										inputmode="numeric"
-										maxlength="2"
-										?readonly="${this.config.read_only}"
-										placeholder="${seg.placeholder}"
-										.value="${this[seg.prop]}"
-										@input="${(ev) => this._onInput(seg.key, ev)}"
-										@blur="${this._onCommit}"
-										@keydown="${this._onKeydown}"
-									/>
-								</div>
-								${this.config.show_steppers && interactive ? html`
-									<button
-										type="button"
-										class="stepper-btn up"
-										@pointerdown="${this._onStepperPointerDown}"
-										@click="${() => this._stepSegment(seg.key, 1)}"
-										aria-label="Increase ${seg.key}"
-									>
-										<span class="stepper-glyph"></span>
-									</button>
-									<button
-										type="button"
-										class="stepper-btn down"
-										@pointerdown="${this._onStepperPointerDown}"
-										@click="${() => this._stepSegment(seg.key, -1)}"
-										aria-label="Decrease ${seg.key}"
-									>
-										<span class="stepper-glyph"></span>
-									</button>
-								` : ''}
-							</div>
-							${this.config.separator_mode === 'units' ? html`<span class="separator" style="${suffixStyle}">${seg.unit}</span>` : ''}
-						`)}
+					<div class="content anchor-${secondaryAnchor} pos-${contentFlowPosition}" style="${contentStyle}">
+						${secondaryAnchor === 'content' && shouldRenderSecondary && (secondaryFlowPosition === 'above' || secondaryFlowPosition === 'left') ? secondaryMarkup : ''}
+						${secondaryButtonAnchor === 'content' && secondaryButtonShouldRender && (secondaryButtonFlowPosition === 'above' || secondaryButtonFlowPosition === 'left') ? secondaryButtonMarkup : ''}
+						<div class="main">${mainMarkup}</div>
+						${secondaryAnchor === 'content' && shouldRenderSecondary && (secondaryFlowPosition === 'below' || secondaryFlowPosition === 'right') ? secondaryMarkup : ''}
+						${secondaryButtonAnchor === 'content' && secondaryButtonShouldRender && (secondaryButtonFlowPosition === 'below' || secondaryButtonFlowPosition === 'right') ? secondaryButtonMarkup : ''}
+						${secondaryAnchor === 'card' && shouldRenderSecondary ? secondaryMarkup : ''}
+						${secondaryButtonAnchor === 'card' && secondaryButtonShouldRender ? secondaryButtonMarkup : ''}
 					</div>
 				</ha-card>
 			`;
