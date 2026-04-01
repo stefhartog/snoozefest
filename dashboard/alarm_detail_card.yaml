@@ -109,32 +109,34 @@ card:
         columns: 1
         square: false
         cards:
-          - type: custom:snoozefest-time-picker-card
+          - type: custom:snoozefest-entity-card
             entity: ${'text.' + vars[0] + '_time'}
             autosave: true
             color: var(--primary-text-color)
-            font_size: 3.5
-            suffix_font_size: 0.6em
+            font_size: 5
+            suffix_font_size: 0.5em
             suffix_opacity: 0.5
             suffix_padding: 0px 0px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
-            padding: 50px
-            padding_left_right: 10px
-            input_width: 1.5em
+            padding_top: 20px
+            padding_bottom: 20px
+            padding_left: 20px
+            padding_right: 20px
+            input_width: 1.2em
             show_steppers: true
-            stepper_hit_height: 1.25em
             stepper_color: var(--secondary-text-color)
             stepper_opacity: 0.5
             stepper_active_opacity: 0.9
-            stepper_input_pad_y: 0em
-            stepper_offset: 1.4em
-            stepper_size: 0.8em
-            stepper_stroke: 0.12em
+            stepper_size: 2em
+            stepper_hit_height: 6em
+            stepper_input_pad_y: 0.8em
+            stepper_offset: 0.2em
+            stepper_stroke: 0.16em
             pending_write_ms: 700
             input_background: rgba(1,1,1,0.1)
             input_border_radius: 0.2em
-            input_padding: 0.5em
+            input_padding: 0.6em
             content_justify: center
       - type: horizontal-stack
         cards:

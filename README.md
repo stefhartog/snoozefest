@@ -30,7 +30,7 @@ snoozefest --config config.json run
 
 ### Local development (Windows/Mac/Linux)
 
-Use the quick start setup above for testing and local development. Creates a dev instance with `snoozefest_dev` MQTT namespace.
+Use the quick start setup above for testing and local development. The MQTT namespace comes from your chosen config file. In this workspace, `config.json` is commonly used for a `snoozefest_dev` test instance, while `config.example.json` shows the default `snoozefest` prefix.
 
 ### Production (Home Assistant Add-on)
 
@@ -40,7 +40,7 @@ For persistent deployment on Home Assistant:
 2. Follow [../ha-addons/snoozefest/README.md](../ha-addons/snoozefest/README.md) for installation
 3. See [MIGRATION.md](MIGRATION.md) for importing dev state to production
 
-When deployed as an add-on, Snoozefest publishes to the `snoozefest` MQTT namespace (distinct from local dev instance).
+When deployed as an add-on, Snoozefest typically publishes to the `snoozefest` MQTT namespace.
 
 Both dev and production instances can coexist without conflict.
 
@@ -82,6 +82,7 @@ Prefix comes from `mqtt_topic_prefix` in config (default: `snoozefest`).
 - <prefix>/cmd/timer/pause
 - <prefix>/cmd/timer/resume
 - <prefix>/cmd/timer/activate
+- <prefix>/cmd/timer/reset
 - <prefix>/cmd/timer/dismiss
 - <prefix>/cmd/settings/timer_add_seconds/set
 - <prefix>/cmd/state/request
@@ -118,12 +119,15 @@ Per-entity set topics are also used by HA discovery entities, for example:
   - weekdays omitted on update keeps current kind
   - weekdays empty means one-off
   - weekdays non-empty means recurring
-- New alarms are created disabled by default.
+- Alarm recurring is derived from selected weekdays and is no longer intended as a separate manual UI control.
+- New alarms are created enabled by default.
 - New timers are created inactive by default.
+- New alarm and timer labels default to empty values.
 - Purge All removes only Snoozefest alarms/timers from scheduler state.
 - Timer discovery payloads are not republished every tick; runtime state updates are.
 - Ringing alarms and timers auto-dismiss after 5 minutes.
 - Timers support `inactive`, `active`, `paused`, and `ringing` states.
+- Timers support `reset`, which restores the configured duration without starting the timer.
 - Recurring alarms do not catch up missed triggers after downtime by default.
 - IDs are compact numeric strings with max 25 alarms and 25 timers.
 
@@ -199,11 +203,12 @@ Dashboard YAML files and the custom time picker card are now grouped under `dash
 
 | File | Purpose |
 |---|---|
-| `dashboard/ha_dashboard_alarms_simple_auto_list_card.yaml` | Auto-list of all alarm entities |
-| `dashboard/ha_dashboard_timers_auto_list_card.yaml` | Auto-list of all timer entities rendered with `custom:snoozefest-time-picker-card` rows |
-| `dashboard/ha_dashboard_alarm_detail_popup_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
-| `dashboard/ha_dashboard_timer_detail_popup_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
-| `dashboard/time_picker_custom.js` | Custom Lovelace card powering the time picker UI |
+| `dashboard/alarm_list_card.yaml` | Auto-list of all alarm entities |
+| `dashboard/timer_list_card.yaml` | Auto-list of all timer entities rendered with the Snoozefest custom entity card rows |
+| `dashboard/alarm_detail_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
+| `dashboard/timer_detail_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
+| `dashboard/snoozefest_entity_card.js` | Current custom Lovelace entity card for alarm/timer row and detail time UI |
+| `dashboard/time_picker_custom.js` | Legacy compatible custom Lovelace card kept for migration/backward compatibility |
 | `dashboard/input_text.js` | Custom Lovelace multiline text input card |
 
 ## Voice automations
@@ -216,4 +221,4 @@ Voice-related Home Assistant automations are grouped under `voice/`:
 | `voice/ha_voice_ringing_announce_automation.yaml` | Satellite announcement automation for ringing alarms/timers |
 | `voice/ha_voice_router.yaml` | Script-style MQTT command router used by voice flows |
 
-For future UI consolidation, helper-removal planning, and JS card migration notes, see `TIMER_UI_ROADMAP.md`.
+For future UI consolidation, helper-removal planning, and the longer-term move toward a fully Snoozefest-owned detail card stack, see `TIMER_UI_ROADMAP.md`.

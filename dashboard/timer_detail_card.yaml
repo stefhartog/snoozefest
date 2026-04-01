@@ -51,7 +51,7 @@ card:
             show_success_messages: false
             title: false
             buttons: false
-            color: var(--primary-text-color)
+            color: var(--secondary-text-color)
             font_size: 1
             card_border: false
             card_background: transparent
@@ -109,76 +109,82 @@ card:
           - entity: ${'sensor.' + vars[0] + '_status'}
             state_not: Inactive
         card:
-          type: custom:snoozefest-time-picker-card
+          type: custom:snoozefest-entity-card
           entity: ${'text.' + vars[0] + '_duration'}
           display_entity: ${'sensor.' + vars[0] + '_remaining'}
           read_only: true
           show_days: false
           show_seconds: true
-          separator_mode: units
-          autosave: false
+          autosave: true
           color: var(--primary-text-color)
-          font_size: 3.5
-          suffix_font_size: 0.4em
+          font_size: 5
+          separator_mode: units
+          suffix_font_size: 0.2em
           suffix_opacity: 0.5
-          suffix_padding: 45px 5px 0px 0px
+          suffix_padding: 0px 0px 0px 0px
           suffix_color: var(--secondary-text-color)
           card_border: false
-          padding: 50px
+          padding_top: 20px
+          padding_bottom: 20px
+          padding_left: 28px
+          padding_right: 20px
           input_width: 1.2em
           show_steppers: true
-          stepper_hit_height: 1.25em
           stepper_color: var(--secondary-text-color)
           stepper_opacity: 0.5
           stepper_active_opacity: 0.9
-          stepper_input_pad_y: 0em
-          stepper_offset: 1.4em
-          stepper_size: 0.8em
-          stepper_stroke: 0.12em
+          stepper_size: 2em
+          stepper_hit_height: 6em
+          stepper_input_pad_y: 0.8em
+          stepper_offset: 0.2em
+          stepper_stroke: 0.16em
           pending_write_ms: 700
-          status_color_target: input
+          status_color_target: card
           status_color_default: var(--secondary-back-color)
           status_color_active: rgba(43, 71, 150,0.3)
           status_color_paused: rgba(138, 128, 51,0.3)
           status_color_snoozed: rgba(138, 128, 51,0.3)
           status_color_ringing: rgba(145, 50, 44,0.3)
           input_border_radius: 0.2em
-          input_padding: 0.4em
+          input_padding: 0.18em
           content_justify: center
       - type: conditional
         conditions:
           - entity: ${'sensor.' + vars[0] + '_status'}
             state: Inactive
         card:
-          type: custom:snoozefest-time-picker-card
+          type: custom:snoozefest-entity-card
           entity: ${'text.' + vars[0] + '_duration'}
           read_only: false
           show_days: false
           show_seconds: true
-          separator_mode: units
           autosave: true
           color: var(--primary-text-color)
-          font_size: 3.5
-          suffix_font_size: 0.4em
+          font_size: 5
+          separator_mode: units
+          suffix_font_size: 0.2em
           suffix_opacity: 0.5
-          suffix_padding: 45px 5px 0px 0px
+          suffix_padding: 0px 0px 0px 0px
           suffix_color: var(--secondary-text-color)
           card_border: false
-          padding: 50px
+          padding_top: 20px
+          padding_bottom: 20px
+          padding_left: 28px
+          padding_right: 20px
           input_width: 1.2em
           show_steppers: true
-          stepper_hit_height: 1.25em
           stepper_color: var(--secondary-text-color)
           stepper_opacity: 0.5
           stepper_active_opacity: 0.9
-          stepper_input_pad_y: 0em
-          stepper_offset: 1.4em
-          stepper_size: 0.8em
-          stepper_stroke: 0.12em
+          stepper_size: 2em
+          stepper_hit_height: 6em
+          stepper_input_pad_y: 0.8em
+          stepper_offset: 0.2em
+          stepper_stroke: 0.16em
           pending_write_ms: 700
           input_background: rgba(1,1,1,0.1)
           input_border_radius: 0.2em
-          input_padding: 0.4em
+          input_padding: 0.18em
           content_justify: center
       - type: grid
         columns: 5

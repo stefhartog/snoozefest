@@ -1,66 +1,129 @@
 ((LitElement) => {
 	const html = LitElement.prototype.html;
 	const css = LitElement.prototype.css;
-	const version = '0.4.1-custom';
+	const version = '0.4.2-custom';
 
 	/*
 	Public options
 
 	Required:
 	- entity | display_entity
+	  - entity: HA entity to write to / bind directly
+	  - display_entity: entity to render when different from write target
 
 	Base behavior:
-	- read_only, at_right, padding_top_bottom
-	- input_width, input_padding, input_border_radius
-	- card_background, card_border, input_background
-
-	Steppers:
-	- show_steppers, stepper_wraputosave, tap_sets_timer_id, hold_dismisses, mqtt_prefix, title
+	- read_only: true | false
+	- autosave: true | false
+	- at_right: true | false
+	- tap_sets_timer_id: helper entity id string
+	- hold_dismisses: true | false
+	- mqtt_prefix: string, defaults to snoozefest
+	- title: free text string
+	- pending_write_ms: number in ms
 
 	Visible segments:
-	- show_days, show_seconds
-	- days_placeholder, hour_placeholder, minute_placeholder, second_placeholder
-	- separator_mode, separator
-	- unit_suffix_days, unit_suffix_hours, unit_suffix_minutes, unit_suffix_seconds
+	- show_days: true | false
+	- show_seconds: true | false
+	- days_placeholder, hour_placeholder, minute_placeholder, second_placeholder: string
+	- separator_mode: colon | units | none
+	- separator: string, used when separator_mode is none/custom-style display
+	- unit_suffix_days, unit_suffix_hours, unit_suffix_minutes, unit_suffix_seconds: string
 
-	Layout and style:
-	- content_justify, content_align, color, font_size
-	- padding, padding_lef
-	- stepper_size, stepper_hit_height, stepper_color, stepper_opacity
-	- stepper_active_opacity, stepper_input_pad_y, stepper_offset, stepper_stroke
+	Main layout and style:
+	- content_justify: flex-start | center | flex-end | space-between | space-around | space-evenly
+	- content_align: flex-start | center | flex-end | stretch
+	- color: CSS color
+	- font_size: CSS size or number-like string
+	- input_width: CSS size
+	- input_padding: CSS padding value
+	- input_border_radius: CSS radius
+	- input_background: CSS color/background
+	- card_background: CSS color/background
+	- card_border: true | false
+	- padding: CSS padding shorthand
+	- padding_top_bottom, padding_left_right: CSS size
+	- padding_top, padding_bottom, padding_left, padding_right: CSS size
+	- content_offset_x, content_offset_y: CSS size, positive or negative
+
+	Steppers:
+	- show_steppers: true | false
+	- stepper_size: CSS size, visual arrow size
+	- stepper_hit_height: CSS size, clickable strip height
+	- stepper_color: CSS color
+	- stepper_opacity: 0..1 string/number
+	- stepper_active_opacity: 0..1 string/number
+	- stepper_input_pad_y: CSS size, reserves room above/below input
+	- stepper_offset: CSS size, distance from input box
+	- stepper_stroke: CSS size, arrow line thickness
 
 	Status colors:
-	- status_entity, status_color_target
-	- status_color_default, status_color_inactive, status_color_active
-	- status_color_snoozed, status_color_paused, status_color_ringing
+	- status_entity: explicit entity id string
+	- status_color_target: none | input | card | both
+	- status_color_default, status_color_inactive, status_color_active: CSS color
+	- status_color_snoozed, status_color_paused, status_color_ringing: CSS color
+	- status_opacity_default, status_opacity_inactive, status_opacity_active: 0..1 string/number
+	- status_opacity_snoozed, status_opacity_paused, status_opacity_ringing: 0..1 string/number
 
 	Secondary content:
-	- secondary_mode, secondary_variant, secondary_text, secondary_entity
-	- secondary_anchor, secondary_position, secondary_align, secondary_gap
-	- secondary_font_size, secondary_color, secondary_opacity, secondary_font_weight
-	- secondary_padding, secondary_offset_x, secondary_offset_y, secondary_z_index
-	- secondary_pointer_events
-	- secondary_icon, secondary_icon_state_entity, secondary_icon_on, secondary_icon_off
-	- secondary_icon_size, secondary_icon_on_color, secondary_icon_off_color
-	- secondary_icon_on_opacity, secondary_icon_off_opacity
-	- secondary_icon_background, secondary_icon_border_radius, secondary_icon_padding
-	- secondary_click_action, secondary_click_service, secondary_click_entity
-	- secondary_click_data, secondary_click_stop_propagation, secondary_aria_label
+	- secondary_mode: none | status | remaining | weekday | weekday_smart | smart_weekday | label | entity
+	- secondary_variant: text | icon
+	- secondary_text: free text string
+	- secondary_entity: entity id string
+	- secondary_anchor: content | card
+	- secondary_position:
+	  - content anchor: above | below | left | right | top | bottom | topleft | topright | bottomleft | bottomright | topcenter | bottomcenter | centerleft | centerright
+	  - card anchor: center | top | bottom | left | right | topleft | topright | bottomleft | bottomright | centerleft | centerright | topcenter | bottomcenter
+	- secondary_align: left | center | right
+	- secondary_gap: CSS size
+	- secondary_font_size: CSS size
+	- secondary_color: CSS color
+	- secondary_opacity: 0..1 string/number
+	- secondary_font_weight: normal | bold | 100..900
+	- secondary_padding: CSS padding value
+	- secondary_offset_x, secondary_offset_y: CSS size, positive or negative
+	- secondary_z_index: integer/number
+	- secondary_pointer_events: none | auto
+	- secondary_icon: mdi:* icon name
+	- secondary_icon_state_entity: entity id string
+	- secondary_icon_on, secondary_icon_off: mdi:* icon name
+	- secondary_icon_size: CSS size
+	- secondary_icon_on_color, secondary_icon_off_color: CSS color
+	- secondary_icon_on_opacity, secondary_icon_off_opacity: 0..1 string/number
+	- secondary_icon_background: CSS color/background
+	- secondary_icon_border_radius: CSS radius
+	- secondary_icon_padding: CSS padding value
+	- secondary_click_action: none | tap_select | dismiss | remove | service | toggle_switch
+	- secondary_click_service: domain.service string
+	- secondary_click_entity: entity id string
+	- secondary_click_data: object
+	- secondary_click_stop_propagation: true | false
+	- secondary_aria_label: free text string
 
 	Secondary button:
-	- secondary_button
-	- secondary_button_anchor, secondary_button_position, secondary_button_align
-	- secondary_button_offset_x, secondary_button_offset_y, secondary_button_z_index
-	- secondary_button_pointer_events
-	- secondary_button_icon, secondary_button_icon_state_entity
-	- secondary_button_icon_on, secondary_button_icon_off, secondary_button_icon_size
-	- secondary_button_icon_on_color, secondary_button_icon_off_color
-	- secondary_button_icon_on_opacity, secondary_button_icon_off_opacity
-	- secondary_button_icon_background, secondary_button_icon_border_radius
-	- secondary_button_icon_padding
-	- secondary_button_click_action, secondary_button_click_service
-	- secondary_button_click_entity, secondary_button_click_data
-	- secondary_button_click_stop_propagation, secondary_button_aria_label
+	- secondary_button: true | false
+	- secondary_button_anchor: content | card
+	- secondary_button_position:
+	  - content anchor: above | below | left | right | top | bottom | topleft | topright | bottomleft | bottomright | topcenter | bottomcenter | centerleft | centerright
+	  - card anchor: center | top | bottom | left | right | topleft | topright | bottomleft | bottomright | centerleft | centerright | topcenter | bottomcenter
+	- secondary_button_align: left | center | right
+	- secondary_button_offset_x, secondary_button_offset_y: CSS size, positive or negative
+	- secondary_button_z_index: integer/number
+	- secondary_button_pointer_events: none | auto
+	- secondary_button_icon: mdi:* icon name
+	- secondary_button_icon_state_entity: entity id string
+	- secondary_button_icon_on, secondary_button_icon_off: mdi:* icon name
+	- secondary_button_icon_size: CSS size
+	- secondary_button_icon_on_color, secondary_button_icon_off_color: CSS color
+	- secondary_button_icon_on_opacity, secondary_button_icon_off_opacity: 0..1 string/number
+	- secondary_button_icon_background: CSS color/background
+	- secondary_button_icon_border_radius: CSS radius
+	- secondary_button_icon_padding: CSS padding value
+	- secondary_button_click_action: none | tap_select | dismiss | remove | service | toggle_switch
+	- secondary_button_click_service: domain.service string
+	- secondary_button_click_entity: entity id string
+	- secondary_button_click_data: object
+	- secondary_button_click_stop_propagation: true | false
+	- secondary_button_aria_label: free text string
 	*/
 
 	const TIMER_REMAINING_RE = /^sensor\..+_timer_\d+_remaining(?:_friendly)?$/;
@@ -104,6 +167,7 @@
 			super();
 			this._onKeydown = this._onKeydown.bind(this);
 			this._onCommit = this._onCommit.bind(this);
+			this._onInputFocus = this._onInputFocus.bind(this);
 			this._onStepperPointerDown = this._onStepperPointerDown.bind(this);
 			this._onCardPointerDown = this._onCardPointerDown.bind(this);
 			this._onCardPointerUp = this._onCardPointerUp.bind(this);
@@ -232,6 +296,7 @@
 				}
 				.main {
 					width: 100%;
+					transform: translate(var(--stpc-main-offset-x, 0), var(--stpc-main-offset-y, 0));
 				}
 				.content.anchor-content.pos-left .main,
 				.content.anchor-content.pos-right .main {
@@ -273,12 +338,17 @@
 					background: transparent;
 					color: inherit;
 					font: inherit;
-					line-height: inherit;
+					line-height: 0;
 					padding: 0;
 					margin: 0;
 					cursor: pointer;
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+					vertical-align: middle;
 				}
 				.secondary-btn.icon ha-icon {
+					display: block;
 					width: var(--stpc-secondary-btn-icon-size, 1em);
 					height: var(--stpc-secondary-btn-icon-size, 1em);
 					--mdc-icon-size: var(--stpc-secondary-btn-icon-size, 1em);
@@ -357,10 +427,10 @@
 				content_align: this._normalizeFlexPosition(config.content_align || config.align || 'center', 'vertical'),
 				show_days: config.show_days === true,
 				show_seconds: config.show_seconds === true,
-				days_placeholder: config.days_placeholder || 'DD',
-				hour_placeholder: config.hour_placeholder || 'HH',
-				minute_placeholder: config.minute_placeholder || 'MM',
-				second_placeholder: config.second_placeholder || 'SS',
+				days_placeholder: config.days_placeholder || '--',
+				hour_placeholder: config.hour_placeholder || '--',
+				minute_placeholder: config.minute_placeholder || '--',
+				second_placeholder: config.second_placeholder || '--',
 				separator_mode: config.separator_mode === 'units' ? 'units' : 'colon',
 				separator: config.separator || ':',
 				unit_suffix_days: config.unit_suffix_days || 'd',
@@ -400,6 +470,12 @@
 				status_color_snoozed: stringValue(config.status_color_snoozed),
 				status_color_paused: stringValue(config.status_color_paused),
 				status_color_ringing: stringValue(config.status_color_ringing),
+				status_opacity_default: stringValue(config.status_opacity_default),
+				status_opacity_inactive: stringValue(config.status_opacity_inactive),
+				status_opacity_active: stringValue(config.status_opacity_active),
+				status_opacity_snoozed: stringValue(config.status_opacity_snoozed),
+				status_opacity_paused: stringValue(config.status_opacity_paused),
+				status_opacity_ringing: stringValue(config.status_opacity_ringing),
 			};
 		}
 
@@ -414,6 +490,12 @@
 				padding: stringValue(config.padding),
 				padding_left_right: stringValue(config.padding_left_right),
 				padding_top_bottom: stringValue(config.padding_top_bottom),
+				padding_top: stringValue(config.padding_top),
+				padding_bottom: stringValue(config.padding_bottom),
+				padding_left: stringValue(config.padding_left),
+				padding_right: stringValue(config.padding_right),
+				content_offset_x: stringValue(config.content_offset_x),
+				content_offset_y: stringValue(config.content_offset_y),
 				input_width: stringValue(config.input_width),
 			};
 		}
@@ -559,6 +641,7 @@
 				switchEntity: base ? `switch.${base}` : null,
 				statusEntity,
 				dismissButtonEntity: base ? `button.${base}_dismiss` : null,
+				removeButtonEntity: base ? `button.${base}_remove` : null,
 				nextDayEntity: base ? `sensor.${base}_next_day` : null,
 				remainingEntity: base ? `sensor.${base}_remaining` : null,
 				friendlyRemainingEntity: base ? `sensor.${base}_remaining_friendly` : null,
@@ -676,6 +759,15 @@
 			});
 		}
 
+		_doRemove() {
+			if (!this._hass) return;
+			const removeButtonEntity = this._resolveEntityContext().removeButtonEntity;
+			if (!removeButtonEntity) return;
+			this._hass.callService('button', 'press', {
+				entity_id: removeButtonEntity,
+			});
+		}
+
 		_secondaryHasClickAction() {
 			return String(this.config?.secondary_click_action || 'none').toLowerCase() !== 'none';
 		}
@@ -695,6 +787,10 @@
 			}
 			if (action === 'dismiss') {
 				this._doHold();
+				return;
+			}
+			if (action === 'remove') {
+				this._doRemove();
 				return;
 			}
 			if (action === 'toggle_switch') {
@@ -764,6 +860,14 @@
 			}
 			const key = `status_color_${status}`;
 			return this.config[key] ?? this.config.status_color_default ?? null;
+		}
+
+		_getStatusOpacity(status) {
+			if (!status) {
+				return this.config.status_opacity_default ?? null;
+			}
+			const key = `status_opacity_${status}`;
+			return this.config[key] ?? this.config.status_opacity_default ?? null;
 		}
 
 		_getDerivedStatusEntity() {
@@ -983,9 +1087,26 @@
 		_getBinaryState(entityId) {
 			const raw = this._getSecondaryEntityState(entityId).toLowerCase();
 			if (!raw) return null;
-			if (raw === 'on' || raw === 'true' || raw === 'active') return 'on';
+			if (raw === 'on' || raw === 'true' || raw === 'active' || raw === 'paused' || raw === 'ringing' || raw === 'snoozed') return 'on';
 			if (raw === 'off' || raw === 'false' || raw === 'inactive') return 'off';
 			return null;
+		}
+
+		_getOverlayStateEntity(type) {
+			const isButton = type === 'button';
+			const explicit = isButton
+				? this.config.secondary_button_icon_state_entity
+				: this.config.secondary_icon_state_entity;
+			if (explicit) return explicit;
+
+			const context = this._resolveEntityContext();
+			if (context.switchEntity && this._hass?.states?.[context.switchEntity]) {
+				return context.switchEntity;
+			}
+			if (context.statusEntity && this._hass?.states?.[context.statusEntity]) {
+				return context.statusEntity;
+			}
+			return context.switchEntity || context.statusEntity || null;
 		}
 
 		_getResolvedStateIcon(defaultIcon, stateEntity, iconOn, iconOff) {
@@ -1109,7 +1230,13 @@
 				this.config.padding != null ? `padding: ${this.config.padding}` : '',
 				this.config.padding_top_bottom != null ? `padding-top: ${this.config.padding_top_bottom}; padding-bottom: ${this.config.padding_top_bottom}` : '',
 				this.config.padding_left_right != null ? `padding-left: ${this.config.padding_left_right}; padding-right: ${this.config.padding_left_right}` : '',
+				this.config.padding_top != null ? `padding-top: ${this.config.padding_top}` : '',
+				this.config.padding_bottom != null ? `padding-bottom: ${this.config.padding_bottom}` : '',
+				this.config.padding_left != null ? `padding-left: ${this.config.padding_left}` : '',
+				this.config.padding_right != null ? `padding-right: ${this.config.padding_right}` : '',
 				this.config.input_width != null ? `--stpc-input-width: ${this.config.input_width}` : '',
+				this.config.content_offset_x != null ? `--stpc-main-offset-x: ${this.config.content_offset_x}` : '',
+				this.config.content_offset_y != null ? `--stpc-main-offset-y: ${this.config.content_offset_y}` : '',
 				this.config.stepper_size != null ? `--stpc-stepper-size: ${this.config.stepper_size}` : '',
 				this.config.stepper_hit_height != null ? `--stpc-stepper-hit-height: ${this.config.stepper_hit_height}` : '',
 				this.config.stepper_color != null ? `--stpc-stepper-color: ${this.config.stepper_color}` : '',
@@ -1145,9 +1272,7 @@
 
 		_getOverlayStatefulIcon(type, fallbackIcon) {
 			const isButton = type === 'button';
-			const stateEntity = isButton
-				? (this.config.secondary_button_icon_state_entity || this._getDerivedSwitchEntity())
-				: (this.config.secondary_icon_state_entity || this._getDerivedSwitchEntity());
+			const stateEntity = this._getOverlayStateEntity(type);
 			const state = this._getBinaryState(stateEntity);
 			const color = isButton
 				? (state === 'on' ? this.config.secondary_button_icon_on_color : (state === 'off' ? this.config.secondary_button_icon_off_color : null))
@@ -1335,6 +1460,8 @@
 									placeholder="${seg.placeholder}"
 									.value="${this[seg.prop]}"
 									@input="${(ev) => this._onInput(seg.key, ev)}"
+									@focus="${this._onInputFocus}"
+									@click="${this._onInputFocus}"
 									@blur="${this._onCommit}"
 									@keydown="${this._onKeydown}"
 								/>
@@ -1373,17 +1500,18 @@
 			].filter(Boolean).join('; ');
 		}
 
-		_renderCardContent(mainMarkup, secondary, secondaryButton) {
+		_renderCardContent(mainMarkup, secondary, secondaryButton, currentStatus) {
 			const secondaryMarkup = this._renderOverlay(secondary);
 			const secondaryButtonMarkup = this._renderOverlay(secondaryButton);
 			const contentFlowPosition = this._getContentFlowPositionForDescriptors(secondary, secondaryButton);
 			const contentStyle = this._buildContentStyle(secondary, contentFlowPosition);
+			const mainStyle = this._getStatusOpacity(currentStatus) != null ? `opacity: ${this._getStatusOpacity(currentStatus)}` : '';
 
 			return html`
 				<div class="content anchor-${secondary.anchor} pos-${contentFlowPosition}" style="${contentStyle}">
 					${secondary.anchor === 'content' && secondary.shouldRender && (secondary.flowPosition === 'above' || secondary.flowPosition === 'left') ? secondaryMarkup : ''}
 					${secondaryButton.anchor === 'content' && secondaryButton.shouldRender && (secondaryButton.flowPosition === 'above' || secondaryButton.flowPosition === 'left') ? secondaryButtonMarkup : ''}
-					<div class="main">${mainMarkup}</div>
+					<div class="main" style="${mainStyle}">${mainMarkup}</div>
 					${secondary.anchor === 'content' && secondary.shouldRender && (secondary.flowPosition === 'below' || secondary.flowPosition === 'right') ? secondaryMarkup : ''}
 					${secondaryButton.anchor === 'content' && secondaryButton.shouldRender && (secondaryButton.flowPosition === 'below' || secondaryButton.flowPosition === 'right') ? secondaryButtonMarkup : ''}
 					${secondary.anchor === 'card' && secondary.shouldRender ? secondaryMarkup : ''}
@@ -1414,7 +1542,7 @@
 					@pointercancel="${this._onCardPointerCancel}"
 				>
 					${this.config.title ? html`<div class="card-header">${this.config.title}</div>` : ''}
-					${this._renderCardContent(mainMarkup, secondary, secondaryButton)}
+					${this._renderCardContent(mainMarkup, secondary, secondaryButton, currentStatus)}
 				</ha-card>
 			`;
 		}
@@ -1450,6 +1578,16 @@
 			if (this.config.autosave && segs.every((s) => this._getSegmentText(s.key).length === 2)) {
 				this._save();
 			}
+		}
+
+		_onInputFocus(ev) {
+			if (this.config.read_only) return;
+			const input = ev.target;
+			if (!(input instanceof HTMLInputElement)) return;
+			requestAnimationFrame(() => {
+				if (this.shadowRoot?.activeElement !== input) return;
+				input.select();
+			});
 		}
 
 		_onKeydown(ev) {

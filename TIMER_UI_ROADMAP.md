@@ -13,8 +13,15 @@ This file captures future design notes for migrating timer dashboard UX from YAM
 
 - Many conditional cards mount/unmount during state changes.
 - Repeated YAML blocks for similar buttons and states.
-- Helper entities (`input_text.snoozefest_timer_id`, `input_text.snoozefest_env`) act as cross-card glue.
+- `input_text.snoozefest_timer_id` still acts as cross-card glue in current dashboard flows.
 - Brief list/detail visual instability when timers are removed/recreated.
+
+## Current Migration State
+
+- `dashboard/snoozefest_entity_card.js` now exists as the refactored successor to `dashboard/time_picker_custom.js`.
+- The new card has been validated as an interchangeable replacement for current alarm/timer row usage.
+- `dashboard/time_picker_custom.js` is still kept as a compatibility path during migration.
+- `input_text.snoozefest_env` has been removed from active dashboard flows; prefix handling is now default `snoozefest` with optional explicit override.
 
 ## Target Architecture
 
@@ -73,7 +80,7 @@ Command behavior:
 Phase target:
 
 - Remove `input_text.snoozefest_timer_id` from normal UI flow.
-- Remove `input_text.snoozefest_env` by deriving env from entity IDs or explicit card config.
+- Keep prefix handling explicit through card config/defaults; do not reintroduce helper-based env switching.
 
 Interim compatibility:
 
@@ -107,12 +114,12 @@ Interim compatibility:
 - Keep service calls explicit and deterministic.
 - If a simplification attempt breaks rendering, revert quickly and continue in the dedicated JS card branch.
 
-## Naming Cleanup Reminder
+## Naming Cleanup Status
 
-- Rename `dashboard/time_picker_custom.js` during the JS-card migration phase.
-- Current name is historical; the file now contains broader timer UI behavior, not only time picking.
-- Suggested target names: `snoozefest_timer_card.js` or `snoozefest_timer_ui_card.js`.
-- For smooth upgrades, keep a temporary compatibility alias (or duplicate registration) so existing dashboards do not break immediately.
+- The broader card rename has started with `dashboard/snoozefest_entity_card.js`.
+- `dashboard/time_picker_custom.js` remains as the legacy compatibility card during migration.
+- Continue favoring the entity-oriented naming direction rather than adding new timer-only names unless a truly timer-specific card emerges later.
+- Keep compatibility registration or duplicate resources in place until dashboard migration is complete.
 
 ## Multiline Input Integration Plan
 
@@ -176,3 +183,4 @@ This is a practical baseline contract for the future single timer card.
 - Keep current custom element names registered while rolling out the new card.
 - Keep helper bridge optional (`compat_mode_helpers`) for existing dashboards.
 - Remove helper dependency after list/detail direct-context flow is proven stable.
+- Long term target remains a Snoozefest-owned detail card stack so dashboard flows no longer depend on unrelated third-party custom cards for core alarm/timer UX.

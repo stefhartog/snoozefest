@@ -14,7 +14,7 @@ cards:
       include:
         - entity_id: /^sensor\.[a-z0-9_]+_alarm_\d+_remaining$/
           options:
-            type: custom:snoozefest-time-picker-card
+            type: custom:snoozefest-entity-card
             entity: input_text.snoozefest_alarm_id
             display_entity: this.entity_id
             mqtt_prefix: snoozefest
@@ -24,13 +24,21 @@ cards:
             separator_mode: colon
             autosave: false
             color: var(--primary-text-color)
-            font_size: 2.5
+            font_size: 5
+            status_opacity_inactive: 0.4
             suffix_font_size: 0.5em
             suffix_opacity: 0.5
             suffix_padding: 0px 0px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
-            padding: 26px 26px
+            padding_top: 12px
+            padding_bottom: 12px
+            padding_left: 20px
+            padding_right: 20px
+            stepper_offset: 0px
+            stepper_size: 10px
+            content_offset_x: 0px
+            content_offset_y: 0px
             input_width: 1.2em
             show_steppers: false
             pending_write_ms: 700
@@ -41,7 +49,7 @@ cards:
             status_color_snoozed: rgba(138, 128, 51,0.3)
             status_color_ringing: rgba(145, 50, 44,0.3)
             input_border_radius: 0.2em
-            input_padding: 0.4em
+            input_padding: 0
             content_justify: left
             tap_sets_timer_id: input_text.snoozefest_alarm_id
             hold_dismisses: true
@@ -49,9 +57,9 @@ cards:
             secondary_anchor: card
             secondary_position: topleft
             secondary_align: center
-            secondary_offset_x: 14px
-            secondary_offset_y: "-11px"
-            secondary_font_size: 0.4em
+            secondary_offset_x: 10px
+            secondary_offset_y: 0px
+            secondary_font_size: 0.2em
             secondary_opacity: "0.4"
             secondary_button: true
             secondary_button_icon_on: mdi:toggle-switch-outline
@@ -63,6 +71,7 @@ cards:
             secondary_button_icon_off_opacity: "0.3"
             secondary_button_anchor: card
             secondary_button_position: right
+            secondary_button_align: center
             secondary_button_z_index: 2
             secondary_button_click_action: toggle_switch
             secondary_button_click_stop_propagation: true
@@ -123,7 +132,7 @@ cards:
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
                   return usedIds.length >= 12
                     ? 'color-mix(in srgb, var(--disabled-text-color) 20%, transparent)'
-                    : 'color-mix(in srgb, var(--primary-color) 14%, transparent)';
+                    : 'color-mix(in srgb, rgba(31, 143, 61,0.6), transparent)';
                 ]]]
             - opacity: |
                 [[[ 
@@ -150,7 +159,7 @@ cards:
                     .map((eid) => parseInt(eid.match(/alarm_(\d+)$/)?.[1] || '', 10));
                   const usedIds = [...new Set([...statusIds, ...switchIds])]
                     .filter((n) => Number.isInteger(n) && n > 0 && n <= 12);
-                  return usedIds.length >= 12 ? 'var(--disabled-text-color)' : 'var(--primary-color)';
+                  return usedIds.length >= 12 ? 'var(--disabled-text-color)' : 'rgba(31, 143, 61,0.6)';
                 ]]]
             - font-size: |
                 [[[ 
