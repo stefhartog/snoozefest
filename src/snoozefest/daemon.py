@@ -2309,7 +2309,6 @@ class Daemon:
 
     def _cmd_state_request(self, payload: dict) -> None:
         self._publish_all_state()
-        self._ack("state/request", True, "State published")
 
     def _cmd_unknown(self, payload: object) -> None:
         self._ack("unknown", False, "Unknown command")
