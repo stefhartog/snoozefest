@@ -64,6 +64,10 @@ class MQTTClient:
 
         logger.info("MQTT connected to %s:%s", self._config.mqtt_host, self._config.mqtt_port)
 
+        # Clear any stale retained message on command_result so voice automations
+        # do not immediately receive an old cached response on subscribe.
+        client.publish(f"{self._prefix}/state/command_result", payload=None, retain=True)
+
         for suffix in (
             "purge_all",
             "alarm/new",

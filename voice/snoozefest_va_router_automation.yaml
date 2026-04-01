@@ -216,13 +216,13 @@ action:
                     value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
                 sequence:
                   - set_conversation_response: >-
-                      Snoozing.
+                      {{ wait.trigger.payload_json.message | default('Snoozing.') }}
               - conditions:
                   - condition: template
                     value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
                 sequence:
                   - set_conversation_response: >-
-                      No alarm found in Ringing state to snooze.
+                      {{ wait.trigger.payload_json.message | default('No alarms are ringing to snooze.') }}
             default:
               - set_conversation_response: >-
                   I sent the snooze command.
