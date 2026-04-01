@@ -2211,11 +2211,23 @@ class Daemon:
     def _cmd_timer_add_time(self, payload: dict, ack_command: str = "timer/add_time") -> None:
         timer_id_raw = payload.get("id")
         timer_id = str(timer_id_raw) if timer_id_raw is not None else None
-        if self._scheduler.add_time_timer(timer_id, seconds=self._timer_add_seconds):
+        seconds_raw = payload.get("seconds")
+        if seconds_raw is None:
+            seconds_raw = payload.get("duration_seconds")
+        minutes_raw = payload.get("minutes")
+        seconds_to_add = self._timer_add_seconds
+        if seconds_raw is not None:
+            seconds_to_add = int(seconds_raw)
+        elif minutes_raw is not None:
+            seconds_to_add = int(minutes_raw) * 60
+        if seconds_to_add < 1:
+            raise ValueError("seconds must be >= 1")
+
+        if self._scheduler.add_time_timer(timer_id, seconds=seconds_to_add):
             if timer_id is None:
                 self._ack(ack_command, True, "Added time to timer(s)")
             else:
-                self._ack(ack_command, True, f"Added {self._timer_add_seconds}s: {timer_id}")
+                self._ack(ack_command, True, f"Added {seconds_to_add}s: {timer_id}")
         else:
             if timer_id is None:
                 self._ack(ack_command, False, "No active, paused, or ringing timers to add time")

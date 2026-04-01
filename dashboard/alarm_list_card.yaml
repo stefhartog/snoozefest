@@ -67,7 +67,7 @@ cards:
             secondary_button_icon_size: 50px
             secondary_button_icon_on_color: var(--secondary-text-color)
             secondary_button_icon_off_color: var(--secondary-text-color)
-            secondary_button_icon_on_opacity: "1"
+            secondary_button_icon_on_opacity: "0.8"
             secondary_button_icon_off_opacity: "0.3"
             secondary_button_anchor: card
             secondary_button_position: right

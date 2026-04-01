@@ -494,8 +494,8 @@ card:
                 state_not: "00:00:00:00"
             card:
               type: custom:button-card
-              name: Back
-              icon: mdi:arrow-left
+              name: Save
+              icon: mdi:check
               tap_action:
                 action: call-service
                 service: input_text.set_value

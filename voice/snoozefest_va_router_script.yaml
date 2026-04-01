@@ -3,7 +3,7 @@ mode: queued
 
 sequence:
   - variables:
-      prefix: snoozefest_dev
+      prefix: snoozefest
       action_name: "{{ action | default('') }}"
       request_id: "{{ request_id | default('va_' ~ now().strftime('%Y%m%d%H%M%S%f')) }}"
       alarm_time: "{{ time | default('') }}"
@@ -52,6 +52,27 @@ sequence:
       alarm_label: "{{ label | default('Voice Alarm') }}"
       timer_label: "{{ label | default('Voice Timer') }}"
       duration_text_raw: "{{ duration_text | default(minutes | default('')) }}"
+      snooze_minutes_raw: "{{ snooze_minutes | default(minutes | default('')) }}"
+      snooze_minutes: >-
+        {% set raw = (snooze_minutes_raw | string | lower | trim) %}
+        {% set mins_map = {
+          'a': 1,
+          'an': 1,
+          'one': 1,
+          'two': 2,
+          'three': 3,
+          'four': 4,
+          'five': 5,
+          'six': 6,
+          'seven': 7,
+          'eight': 8,
+          'nine': 9,
+          'ten': 10,
+          'fifteen': 15,
+          'twenty': 20,
+          'thirty': 30
+        } %}
+        {{ mins_map.get(raw, raw | int(0)) }}
       timer_secs: >-
         {% set ds = duration_seconds | default(0) | int %}
         {% set mins_raw = (duration_text_raw | string | lower | trim) %}
@@ -96,7 +117,10 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/alarm/snooze"
               payload: >-
-                {{ ({'id': alarm_id, 'request_id': request_id} if alarm_id is defined and alarm_id else {'request_id': request_id}) | tojson }}
+                {% set base = {'request_id': request_id} %}
+                {% set base = base | combine({'id': alarm_id}) if alarm_id is defined and alarm_id else base %}
+                {% set base = base | combine({'minutes': (snooze_minutes | int)}) if (snooze_minutes | int(0)) > 0 else base %}
+                {{ base | tojson }}
 
       - conditions: "{{ action_name == 'dismiss_alarm' }}"
         sequence:
@@ -112,7 +136,10 @@ sequence:
             data:
               topic: "{{ prefix }}/cmd/timer/snooze"
               payload: >-
-                {{ ({'id': timer_id, 'request_id': request_id} if timer_id is defined and timer_id else {'request_id': request_id}) | tojson }}
+                {% set base = {'request_id': request_id} %}
+                {% set base = base | combine({'id': timer_id}) if timer_id is defined and timer_id else base %}
+                {% set base = base | combine({'minutes': (snooze_minutes | int)}) if (snooze_minutes | int(0)) > 0 else base %}
+                {{ base | tojson }}
 
       - conditions: "{{ action_name == 'dismiss_timer' }}"
         sequence:

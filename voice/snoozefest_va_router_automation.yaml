@@ -2,7 +2,7 @@ alias: Snoozefest Voice Master Router
 description: Single Assist automation using trigger ids to route alarm and timer commands
 mode: single
 variables:
-  mqtt_prefix: snoozefest_dev
+  mqtt_prefix: snoozefest
 
 trigger:
   - id: set_alarm
@@ -32,6 +32,10 @@ trigger:
     command:
       - snooze alarm
       - snooze the alarm
+      - snooze alarm for {snooze_minutes} minutes
+      - snooze alarm for {snooze_minutes} minute
+      - snooze for {snooze_minutes} minutes
+      - snooze for {snooze_minutes} minute
 
   - id: dismiss_timer
     platform: conversation
@@ -45,6 +49,10 @@ trigger:
     command:
       - snooze timer
       - snooze the timer
+      - snooze timer for {minutes} minutes
+      - snooze timer for {minutes} minute
+      - add {minutes} minutes to timer
+      - add {minutes} minute to timer
 
 
 action:
@@ -190,9 +198,11 @@ action:
         sequence:
           - variables:
               op_request_id: "vm_snooze_alarm_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
+              requested_snooze_minutes: "{{ trigger.slots.snooze_minutes | default(trigger.slots.minutes | default('')) }}"
           - service: script.snoozefest_voice_router
             data:
               action: snooze_alarm
+              snooze_minutes: "{{ requested_snooze_minutes }}"
               request_id: "{{ op_request_id }}"
           - wait_for_trigger:
               - platform: mqtt
@@ -258,9 +268,11 @@ action:
         sequence:
           - variables:
               op_request_id: "vm_snooze_timer_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
+              requested_add_minutes: "{{ trigger.slots.minutes | default(trigger.slots.snooze_minutes | default('')) }}"
           - service: script.snoozefest_voice_router
             data:
               action: snooze_timer
+              minutes: "{{ requested_add_minutes }}"
               request_id: "{{ op_request_id }}"
           - wait_for_trigger:
               - platform: mqtt

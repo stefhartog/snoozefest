@@ -3,7 +3,7 @@ description: Proactive VA announcement when alarms/timers begin ringing
 mode: single
 max_exceeded: silent
 trigger_variables:
-  mqtt_prefix: snoozefest_dev
+  mqtt_prefix: snoozefest
 
 trigger:
   - id: alarm_ringing
