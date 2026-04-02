@@ -15,21 +15,11 @@ You can start with just the add-on, then optionally add:
 - dashboard UI cards (`dashboard/`) for rich mobile control
 - voice automations and LLM wrappers (`voice/`) for natural-language control
 
-## Quick start (core brain)
+Demo's:
 
-```bash
-cd snoozefest
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-pip install -e .
-```
+https://youtube.com/shorts/CXPe5jR7D1A?feature=share
 
-Run the daemon:
-
-```bash
-snoozefest --config config.json run
-```
+https://youtube.com/shorts/fIQWbVyo7Eg?feature=share
 
 ## Deployment
 
