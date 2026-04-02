@@ -1,0 +1,105 @@
+alias: Snoozefest Ringing Notification
+description: >-
+  Sends a phone notification when alarms/timers are ringing. Snooze snoozes
+  ringing alarms and adds time to ringing timers. Dismiss stops everything.
+mode: restart
+sequence:
+  - variables:
+      mqtt_prefix: snoozefest
+      action_snooze: "{{ 'SNOOZE_' ~ context.id }}"
+      action_dismiss: "{{ 'DISMISS_' ~ context.id }}"
+      ringing_alarm_count: >-
+        {{
+          states.sensor
+          | selectattr('entity_id', 'match', '^sensor\\.' ~ mqtt_prefix ~ '_alarm_\\d+_status$')
+          | selectattr('state', 'eq', 'Ringing')
+          | list | count
+        }}
+      ringing_timer_count: >-
+        {{
+          states.sensor
+          | selectattr('entity_id', 'match', '^sensor\\.' ~ mqtt_prefix ~ '_timer_\\d+_status$')
+          | selectattr('state', 'eq', 'Ringing')
+          | list | count
+        }}
+      notify_title: >-
+        {% if (ringing_alarm_count | int) > 0 and (ringing_timer_count | int) > 0 %}
+          Alarm & Timer Ringing
+        {% elif (ringing_alarm_count | int) > 0 %}
+          Alarm Ringing
+        {% else %}
+          Timer Ringing
+        {% endif %}
+      notify_message: >-
+        {% set parts = [] %}
+        {% if (ringing_alarm_count | int) > 0 %}
+          {% set parts = parts + [(ringing_alarm_count | string) ~ ' alarm' ~ ('' if (ringing_alarm_count | int) == 1 else 's')] %}
+        {% endif %}
+        {% if (ringing_timer_count | int) > 0 %}
+          {% set parts = parts + [(ringing_timer_count | string) ~ ' timer' ~ ('' if (ringing_timer_count | int) == 1 else 's')] %}
+        {% endif %}
+        {{ parts | join(' and ') }} ringing.
+
+  - alias: Send notification
+    domain: mobile_app
+    type: notify
+    device_id: 0ea455edfa75cab03ed8f421e0792f88
+    title: "{{ notify_title }}"
+    message: "{{ notify_message }}"
+    data:
+      tag: snoozefest_ringing
+      url: /dashboard-snoozefest/
+      clickAction: homeassistant://navigate/dashboard-snoozefest/
+      actions:
+        - action: "{{ action_snooze }}"
+          title: Snooze
+        - action: "{{ action_dismiss }}"
+          title: Dismiss
+
+  - alias: Await response
+    wait_for_trigger:
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ action_snooze }}"
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ action_dismiss }}"
+    timeout: "00:10:00"
+    continue_on_timeout: false
+
+  - choose:
+      - conditions: "{{ wait.trigger.event.data.action == action_snooze }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ (ringing_alarm_count | int) > 0 }}"
+            then:
+              - service: script.snoozefest_voice_router
+                data:
+                  action: snooze_alarm
+          - if:
+              - condition: template
+                value_template: "{{ (ringing_timer_count | int) > 0 }}"
+            then:
+              - service: script.snoozefest_voice_router
+                data:
+                  action: snooze_timer
+
+      - conditions: "{{ wait.trigger.event.data.action == action_dismiss }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ (ringing_alarm_count | int) > 0 }}"
+            then:
+              - service: script.snoozefest_voice_router
+                data:
+                  action: dismiss_alarm
+          - if:
+              - condition: template
+                value_template: "{{ (ringing_timer_count | int) > 0 }}"
+            then:
+              - service: script.snoozefest_voice_router
+                data:
+                  action: dismiss_timer

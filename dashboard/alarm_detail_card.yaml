@@ -50,31 +50,6 @@ card:
   card:
     type: vertical-stack
     cards:
-      - type: custom:button-card
-        show_icon: true
-        show_name: true
-        icon: mdi:alert-circle-outline
-        name: This alarm no longer exists. Tap to go back.
-        tap_action:
-          action: call-service
-          service: input_text.set_value
-          data:
-            entity_id: input_text.snoozefest_alarm_id
-            value: ""
-        styles:
-          card:
-            - display: >-
-                ${(() => {
-                  const alarmEntity = 'switch.' + vars[0];
-                  const st = states[alarmEntity] && states[alarmEntity].state ? String(states[alarmEntity].state).toLowerCase() : '';
-                  const missing = !st || st === 'unknown' || st === 'unavailable';
-                  return missing ? 'block' : 'none';
-                })()}
-          name:
-            - font-size: 0.9em
-            - color: var(--warning-color)
-          icon:
-            - color: var(--warning-color)
       - type: conditional
         conditions:
           - entity: ${'sensor.' + vars[0] + '_status'}

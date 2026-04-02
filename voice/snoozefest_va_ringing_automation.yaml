@@ -86,6 +86,10 @@ action:
             data:
               message: "{{ announce_message }}"
 
+          - service: script.turn_on
+            target:
+              entity_id: script.snoozefest_ringing_notification
+
           - repeat:
               while:
                 - condition: template
