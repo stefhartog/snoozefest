@@ -8,51 +8,110 @@ trigger:
   - id: set_alarm
     platform: conversation
     command:
+      # Low-risk explicit alarm phrases
       - set an alarm for {time}
       - wake me up at {time}
+      - wake me at {time}
+      - set my alarm for {time}
+      - can you set an alarm for {time}
+      - i need an alarm for {time}
+      - put an alarm on for {time}
+      - get me up at {time}
+      - wake me tomorrow at {time}
+      - wake me up tomorrow at {time}
+      - get me up tomorrow at {time}
+      # Higher-collision shorthand, test against built-in intents
+      - alarm for {time}
 
   - id: set_timer
     platform: conversation
     command:
+      # Low-risk explicit timer phrases
       - set a timer for {minutes} minutes
       - set a timer for {minutes} minute
       - start a {minutes} minute timer
       - set a timer for {duration}
       - start a timer for {duration}
+      - timer for {duration}
+      - countdown for {duration}
+      - start a countdown for {duration}
+      - can you set a timer for {duration}
+      - i need a timer for {duration}
+      - put on a timer for {duration}
+      - make a timer for {duration}
+      - run a timer for {duration}
+      # Higher-collision reminder/shorthand phrases
+      - remind me in {duration}
+      - in {duration}
+      - wake me in {duration}
 
   - id: dismiss_alarm
     platform: conversation
     command:
+      # Low-risk explicit dismiss phrases
       - dismiss alarm
       - stop alarm
       - turn off alarm
+      - stop that alarm
+      - kill the alarm
+      - silence the alarm
+      - shut the alarm off
+      # Higher-collision natural replies
+      - i am awake
+      - i'm awake
+      - i am up
+      - i'm up
 
   - id: snooze_alarm
     platform: conversation
     command:
+      # Low-risk explicit snooze phrases
       - snooze alarm
       - snooze the alarm
       - snooze alarm for {snooze_minutes} minutes
       - snooze alarm for {snooze_minutes} minute
       - snooze for {snooze_minutes} minutes
       - snooze for {snooze_minutes} minute
+      - snooze it for {snooze_minutes} minutes
+      - snooze it for {snooze_minutes} minute
+      # More conversational extensions
+      - give me {snooze_minutes} more minutes
+      - give me {snooze_minutes} more minute
+      - wake me again in {snooze_minutes} minutes
+      - wake me again in {snooze_minutes} minute
 
   - id: dismiss_timer
     platform: conversation
     command:
+      # Low-risk explicit dismiss phrases
       - dismiss timer
       - stop timer
       - turn off timer
+      - stop the timer
+      - cancel the timer
+      - turn the timer off
+      - make the timer stop
+      - silence the timer
 
   - id: snooze_timer
     platform: conversation
     command:
+      # Low-risk explicit add-time phrases
       - snooze timer
       - snooze the timer
       - snooze timer for {minutes} minutes
       - snooze timer for {minutes} minute
       - add {minutes} minutes to timer
       - add {minutes} minute to timer
+      - add {minutes} more minutes to timer
+      - add {minutes} more minute to timer
+      # More conversational extensions
+      - give it {minutes} more minutes
+      - give it {minutes} more minute
+      - extend the timer by {minutes} minutes
+      - extend the timer by {minutes} minute
+      - add another {minutes} minutes to the timer
+      - add another {minutes} minute to the timer
 
 
 action:

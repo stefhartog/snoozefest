@@ -15,9 +15,17 @@ fields:
         mode: box
     name: Add Minutes
     description: >-
-      Mandatory. Number of minutes to add. Always provide this field.
-      Example: 5 means add 5 minutes.
-    required: true
+      Preferred numeric add-time in whole minutes. Example: 5 means add 5
+      minutes.
+    required: false
+  add_duration_text:
+    selector:
+      text: null
+    name: Add Duration Text
+    description: >-
+      Fallback natural-language add-time. Examples: "90 seconds", "2 hours 5
+      minutes", "two minutes".
+    required: false
   timer_id:
     selector:
       text: null
@@ -42,14 +50,23 @@ fields:
 sequence:
   - variables:
       normalized_minutes: "{{ add_minutes | int(0) }}"
+      add_duration_text_clean: "{{ add_duration_text | default('', true) | string | trim }}"
+      normalized_add_duration_text: >-
+        {% if add_duration_text_clean != '' %}
+          {{ add_duration_text_clean }}
+        {% elif normalized_minutes > 0 %}
+          {{ normalized_minutes }} minutes
+        {% else %}
+          
+        {% endif %}
       normalized_timer_id: "{{ timer_id | default('', true) | string | trim }}"
       normalized_request_id: >-
         {{ request_id | default('llm_add_time_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
       invalid_response:
-        response: Add Minutes must be at least 1.
+        response: Add time duration is required.
   - if:
       - condition: template
-        value_template: "{{ normalized_minutes < 1 }}"
+        value_template: "{{ normalized_minutes < 1 and normalized_add_duration_text == '' }}"
     then:
       - stop: Invalid add-time duration provided
         response_variable: invalid_response
@@ -57,7 +74,7 @@ sequence:
     service: script.snoozefest_voice_router
     data:
       action: snooze_timer
-      minutes: "{{ normalized_minutes }}"
+      duration_text: "{{ normalized_add_duration_text }}"
       timer_id: "{{ normalized_timer_id }}"
       request_id: "{{ normalized_request_id }}"
   - sequence: []

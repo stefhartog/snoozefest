@@ -30,12 +30,14 @@ Always call:
 - service: `script.turn_on`
 - entity: `script.snoozefest_va_set_timer_llm_script`
 - data:
-  - `duration_minutes`: integer minutes if confidently available
-  - `duration_text`: original duration phrase when minutes are uncertain
+  - `duration_minutes`: integer whole minutes only when the duration is confidently minute-based
+  - `duration_text`: original duration phrase for anything richer or uncertain, including seconds, hours, and mixed durations like `2 hours 5 minutes` or `two hours and five minutes`
   - `label`: empty string unless explicitly requested
   - `temporary`: true only if explicitly requested
   - `request_description`: short summary
   - `request_id`: unique string
+
+Prefer `duration_text` over forcing conversion when the request includes seconds or mixed units.
 
 If no duration can be inferred, ask exactly one short question: `How long?`
 
@@ -69,12 +71,15 @@ Always call:
 - service: `script.turn_on`
 - entity: `script.snoozefest_va_add_time_llm_script`
 - data:
-  - `add_minutes`: required integer
+  - `add_minutes`: integer whole minutes only when the add-time request is confidently minute-based
+  - `add_duration_text`: original add-time phrase for anything richer or uncertain, including seconds, hours, and mixed durations like `2 hours 5 minutes` or `two minutes`
   - `timer_id`: optional, empty if not specified
   - `request_description`: short summary
   - `request_id`: unique string
 
-If amount is missing, ask exactly one short question: `How many minutes?`
+Prefer `add_duration_text` over forcing conversion when the request includes seconds or mixed units.
+
+If amount is missing, ask exactly one short question: `How long should I add?`
 
 ### Snooze ringing alarm
 

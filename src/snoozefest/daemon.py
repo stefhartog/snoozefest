@@ -2215,11 +2215,14 @@ class Daemon:
         if seconds_raw is None:
             seconds_raw = payload.get("duration_seconds")
         minutes_raw = payload.get("minutes")
+        duration_text_raw = payload.get("duration_text")
         seconds_to_add = self._timer_add_seconds
         if seconds_raw is not None:
             seconds_to_add = int(seconds_raw)
         elif minutes_raw is not None:
             seconds_to_add = int(minutes_raw) * 60
+        elif duration_text_raw is not None:
+            seconds_to_add = self._parse_duration_seconds({"duration_text": duration_text_raw}, default_seconds=self._timer_add_seconds)
         if seconds_to_add < 1:
             raise ValueError("seconds must be >= 1")
 

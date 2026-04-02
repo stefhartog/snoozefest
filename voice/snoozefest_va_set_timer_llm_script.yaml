@@ -16,15 +16,15 @@ fields:
     name: Duration Minutes
     description: >-
       Preferred numeric duration in whole minutes. Example: 30 for a 30 minute
-      timer, 90 for 1 hour 30 minutes.
+      timer, 90 for a 1 hour 30 minute timer.
     required: false
   duration_text:
     selector:
       text: null
     name: Duration Text
     description: >-
-      Fallback natural-language duration. Examples: "30 minutes", "1 hour 15
-      minutes", "90 seconds".
+      Fallback natural-language duration. Examples: "30 minutes", "2 hours 5
+      minutes", "two hours and five minutes", "45 seconds".
     required: false
   label:
     selector:
@@ -57,55 +57,23 @@ sequence:
   - variables:
       duration_num: "{{ duration_minutes | int(0) if duration_minutes is defined else 0 }}"
       duration_text_clean: "{{ duration_text | default('', true) | string | trim }}"
-      duration_raw: >-
-        {% if duration_num > 0 %}
-          {{ duration_num }}
-        {% else %}
+      normalized_duration_text: >-
+        {% if duration_text_clean != '' %}
           {{ duration_text_clean }}
-        {% endif %}
-      duration_compact: >-
-        {{ (duration_raw | string | lower | trim)
-           | replace(',', ' ')
-           | replace(' and ', ' ')
-           | replace('-', ' ') }}
-      matched_hours: >-
-        {{ (duration_compact
-            | regex_findall('([0-9]+(?:\.[0-9]+)?)\s*(?:h|hr|hrs|hour|hours)')
-            | first
-            | default('', true)) }}
-      matched_minutes: >-
-        {{ (duration_compact
-            | regex_findall('([0-9]+(?:\.[0-9]+)?)\s*(?:m|min|mins|minute|minutes)')
-            | first
-            | default('', true)) }}
-      matched_seconds: >-
-        {{ (duration_compact
-            | regex_findall('([0-9]+(?:\.[0-9]+)?)\s*(?:s|sec|secs|second|seconds)')
-            | first
-            | default('', true)) }}
-      normalized_minutes: >-
-        {% if duration_num > 0 %}
-          {{ duration_num }}
+        {% elif duration_num > 0 %}
+          {{ duration_num }} minutes
         {% else %}
-          {% set h = matched_hours | float(0) %}
-          {% set m = matched_minutes | float(0) %}
-          {% set s = matched_seconds | float(0) %}
-          {% if h > 0 or m > 0 or s > 0 %}
-            {{ ((h * 60) + m + (s / 60)) | round(0, 'ceil') | int }}
-          {% else %}
-            {% set plain = duration_compact | regex_replace('[^0-9.]', '') | float(0) %}
-            {{ plain | int(0) }}
-          {% endif %}
+          
         {% endif %}
       normalized_label: "{{ label | default('', true) | string | trim }}"
       normalized_temporary: "{{ temporary | default(false, true) | bool(false) }}"
       normalized_request_id: >-
         {{ request_id | default('llm_timer_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
       invalid_response:
-        response: Duration must be at least 1 minute.
+        response: Duration is required.
   - if:
       - condition: template
-        value_template: "{{ normalized_minutes < 1 }}"
+        value_template: "{{ duration_num < 1 and normalized_duration_text == '' }}"
     then:
       - stop: Invalid timer duration provided
         response_variable: invalid_response
@@ -113,8 +81,7 @@ sequence:
     service: script.snoozefest_voice_router
     data:
       action: set_timer
-      minutes: "{{ normalized_minutes }}"
-      duration_text: "{{ duration_raw | default(normalized_minutes, true) }}"
+      duration_text: "{{ normalized_duration_text }}"
       label: "{{ normalized_label }}"
       temporary: "{{ normalized_temporary }}"
       request_id: "{{ normalized_request_id }}"

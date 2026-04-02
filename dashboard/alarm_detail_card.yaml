@@ -50,96 +50,148 @@ card:
   card:
     type: vertical-stack
     cards:
-      - type: grid
-        columns: 2
-        square: false
-        cards:
-          - type: custom:lovelace-multiline-text-input-card
-            autosave: true
-            entity: ${'text.' + vars[0] + '_label'}
-            max_length: 12
-            min_length: 0
-            placeholder_text: ${'Alarm ' + states['input_text.snoozefest_alarm_id'].state}
-            show_success_messages: false
-            title: false
-            buttons: false
-            color: var(--primary-text-color)
-            font_size: 1
-            card_border: false
-            card_background: false
-            padding: null
-            padding_left: 2
-            padding_top: 4
-          - type: custom:button-card
-            entity: ${'sensor.' + vars[0] + '_status'}
-            show_name: false
-            show_icon: false
-            show_state: true
-            state_display: |-
-              ${(() => {
-                const statusEntity = 'sensor.' + vars[0] + '_status';
-                const nextDayEntity = 'sensor.' + vars[0] + '_next_day';
-                const status = states[statusEntity] && states[statusEntity].state ? states[statusEntity].state : '';
-                const nextDay = states[nextDayEntity] && states[nextDayEntity].state && states[nextDayEntity].state !== 'unknown' && states[nextDayEntity].state !== 'unavailable'
-                  ? states[nextDayEntity].state
-                  : '';
-                return status === 'Active' && nextDay ? nextDay : status;
-              })()}
-            color_type: card
-            tap_action:
-              action: none
-            hold_action:
-              action: none
-            double_tap_action:
-              action: none
-            styles:
-              card:
-                - border: none
-                - background: none
-                - box-shadow: none
-                - padding: 0px
-                - padding-top: 7px
-                - padding-right: 5px
-              state:
-                - align-self: bottom
-                - justify-self: end
-                - font-size: 0.7em
-                - color: rgba(255,255,255,0.2)
-      - type: grid
-        columns: 1
-        square: false
-        cards:
-          - type: custom:snoozefest-entity-card
-            entity: ${'text.' + vars[0] + '_time'}
-            autosave: true
-            color: var(--primary-text-color)
-            font_size: 5
-            suffix_font_size: 0.5em
-            suffix_opacity: 0.5
-            suffix_padding: 0px 0px 0px 0px
-            suffix_color: var(--secondary-text-color)
-            card_border: false
-            padding_top: 20px
-            padding_bottom: 20px
-            padding_left: 20px
-            padding_right: 20px
-            input_width: 1.2em
-            show_steppers: true
-            stepper_color: var(--secondary-text-color)
-            stepper_opacity: 0.5
-            stepper_active_opacity: 0.9
-            stepper_size: 2em
-            stepper_hit_height: 6em
-            stepper_input_pad_y: 0.8em
-            stepper_offset: 0.2em
-            stepper_stroke: 0.16em
-            pending_write_ms: 700
-            input_background: rgba(1,1,1,0.1)
-            input_border_radius: 0.2em
-            input_padding: 0.6em
-            content_justify: center
-      - type: horizontal-stack
-        cards:
+      - type: custom:button-card
+        show_icon: true
+        show_name: true
+        icon: mdi:alert-circle-outline
+        name: This alarm no longer exists. Tap to go back.
+        tap_action:
+          action: call-service
+          service: input_text.set_value
+          data:
+            entity_id: input_text.snoozefest_alarm_id
+            value: ""
+        styles:
+          card:
+            - display: >-
+                ${(() => {
+                  const alarmEntity = 'switch.' + vars[0];
+                  const st = states[alarmEntity] && states[alarmEntity].state ? String(states[alarmEntity].state).toLowerCase() : '';
+                  const missing = !st || st === 'unknown' || st === 'unavailable';
+                  return missing ? 'block' : 'none';
+                })()}
+          name:
+            - font-size: 0.9em
+            - color: var(--warning-color)
+          icon:
+            - color: var(--warning-color)
+      - type: conditional
+        conditions:
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: ""
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unknown
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unavailable
+        card:
+          type: grid
+          columns: 2
+          square: false
+          cards:
+            - type: custom:lovelace-multiline-text-input-card
+              autosave: true
+              entity: ${'text.' + vars[0] + '_label'}
+              max_length: 12
+              min_length: 0
+              placeholder_text: ${'Alarm ' + states['input_text.snoozefest_alarm_id'].state}
+              show_success_messages: false
+              title: false
+              buttons: false
+              color: var(--primary-text-color)
+              font_size: 1
+              card_border: false
+              card_background: false
+              padding: null
+              padding_left: 2
+              padding_top: 4
+            - type: custom:button-card
+              entity: ${'sensor.' + vars[0] + '_status'}
+              show_name: false
+              show_icon: false
+              show_state: true
+              state_display: |-
+                ${(() => {
+                  const statusEntity = 'sensor.' + vars[0] + '_status';
+                  const nextDayEntity = 'sensor.' + vars[0] + '_next_day';
+                  const status = states[statusEntity] && states[statusEntity].state ? states[statusEntity].state : '';
+                  const nextDay = states[nextDayEntity] && states[nextDayEntity].state && states[nextDayEntity].state !== 'unknown' && states[nextDayEntity].state !== 'unavailable'
+                    ? states[nextDayEntity].state
+                    : '';
+                  return status === 'Active' && nextDay ? nextDay : status;
+                })()}
+              color_type: card
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              double_tap_action:
+                action: none
+              styles:
+                card:
+                  - border: none
+                  - background: none
+                  - box-shadow: none
+                  - padding: 0px
+                  - padding-top: 7px
+                  - padding-right: 5px
+                state:
+                  - align-self: bottom
+                  - justify-self: end
+                  - font-size: 0.7em
+                  - color: rgba(255,255,255,0.2)
+      - type: conditional
+        conditions:
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: ""
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unknown
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unavailable
+        card:
+          type: grid
+          columns: 1
+          square: false
+          cards:
+            - type: custom:snoozefest-entity-card
+              entity: ${'text.' + vars[0] + '_time'}
+              autosave: true
+              color: var(--primary-text-color)
+              font_size: 5
+              suffix_font_size: 0.5em
+              suffix_opacity: 0.5
+              suffix_padding: 0px 0px 0px 0px
+              suffix_color: var(--secondary-text-color)
+              card_border: false
+              padding_top: 20px
+              padding_bottom: 20px
+              padding_left: 20px
+              padding_right: 20px
+              input_width: 1.2em
+              show_steppers: true
+              stepper_color: var(--secondary-text-color)
+              stepper_opacity: 0.5
+              stepper_active_opacity: 0.9
+              stepper_size: 2em
+              stepper_hit_height: 6em
+              stepper_input_pad_y: 0.8em
+              stepper_offset: 0.2em
+              stepper_stroke: 0.16em
+              pending_write_ms: 700
+              input_background: rgba(1,1,1,0.1)
+              input_border_radius: 0.2em
+              input_padding: 0.6em
+              content_justify: center
+      - type: conditional
+        conditions:
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: ""
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unknown
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unavailable
+        card:
+          type: horizontal-stack
+          cards:
           - type: custom:button-card
             entity: ${'switch.' + vars[0] + '_weekday_0'}
             color_type: card
@@ -301,10 +353,19 @@ card:
                     - box-shadow: inset 0px 0px 0px 1px rgba(255, 255, 255, 0.07)
                   name:
                     - color: var(--secondary-text-color)
-      - type: grid
-        columns: 4
-        square: false
-        cards:
+      - type: conditional
+        conditions:
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: ""
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unknown
+          - entity: ${'sensor.' + vars[0] + '_status'}
+            state_not: unavailable
+        card:
+          type: grid
+          columns: 4
+          square: false
+          cards:
           - type: conditional
             conditions:
               - entity: ${'sensor.' + vars[0] + '_status'}
