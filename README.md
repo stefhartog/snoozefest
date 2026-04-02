@@ -21,6 +21,15 @@ https://youtube.com/shorts/CXPe5jR7D1A?feature=share
 
 https://youtube.com/shorts/fIQWbVyo7Eg?feature=share
 
+## Prerequisite: MQTT broker
+
+Snoozefest requires a working MQTT broker that Home Assistant can reach.
+
+- Recommended: Home Assistant Mosquitto broker add-on
+- Alternative: your own external MQTT server
+
+Home Assistant MQTT integration must be configured to the same broker so discovery entities appear.
+
 ## Deployment
 
 ### Local development (Windows/Mac/Linux)
@@ -48,7 +57,8 @@ Both dev and production instances can coexist without conflict.
 
 ### Phase 2: Dashboard UI (optional)
 
-- Add card resources from `dashboard/`.
+- Copy custom JS cards from `dashboard/` into your Home Assistant `www` folder (for example `/config/www/snoozefest/`).
+- Add those JS files to Dashboard Resources as `module` type.
 - Import list/detail card YAML.
 - Use the Snoozefest custom card for compact mobile-friendly control.
 
@@ -222,8 +232,26 @@ Dashboard YAML files and the custom time picker card are now grouped under `dash
 | `dashboard/alarm_detail_card.yaml` | Single-alarm detail popup; set alarm ID in `variables[0]` |
 | `dashboard/timer_detail_card.yaml` | Single-timer detail popup; reads selected timer ID from `input_text.snoozefest_timer_id` |
 | `dashboard/snoozefest_entity_card.js` | Current custom Lovelace entity card for alarm/timer row and detail time UI |
-| `dashboard/time_picker_custom.js` | Legacy compatible custom Lovelace card kept for migration/backward compatibility |
-| `dashboard/input_text.js` | Custom Lovelace multiline text input card |
+| `dashboard/snoozefest_multiline_text_input.js` | Snoozefest custom Lovelace multiline text input card |
+
+Dashboard YAML in this repo also depends on these non-standard Lovelace cards/plugins:
+
+- `custom:button-card`
+- `custom:auto-entities`
+- `custom:config-template-card`
+- `custom:snoozefest-multiline-text-input-card` (provided by `dashboard/snoozefest_multiline_text_input.js` in this repo)
+
+Install external cards via HACS (or manual resources) before importing the dashboard YAML files.
+
+To install the custom cards in Home Assistant:
+
+1. Copy these files into your HA `www` path (recommended subfolder shown):
+  - `dashboard/snoozefest_entity_card.js` -> `/config/www/snoozefest/snoozefest_entity_card.js`
+  - `dashboard/snoozefest_multiline_text_input.js` -> `/config/www/snoozefest/snoozefest_multiline_text_input.js`
+2. In Home Assistant, go to Dashboards -> Resources and add:
+  - URL: `/local/snoozefest/snoozefest_entity_card.js` | Type: `module`
+  - URL: `/local/snoozefest/snoozefest_multiline_text_input.js` | Type: `module`
+3. Reload your dashboard and then import/use the YAML cards from `dashboard/`.
 
 ## Voice automations and scripts
 
