@@ -1,6 +1,6 @@
 # snoozefest
 
-Local alarm and timer service with JSON persistence and Home Assistant MQTT discovery.
+Local-first alarm and timer brain for Home Assistant, powered by MQTT discovery.
 
 The current control model is entity-first:
 
@@ -8,9 +8,14 @@ The current control model is entity-first:
 - one device per alarm
 - one device per timer
 
-No dashboard YAML or HA script glue is required for normal operation.
+No dashboard YAML or HA script glue is required for normal core operation.
 
-## Quick start
+You can start with just the add-on, then optionally add:
+
+- dashboard UI cards (`dashboard/`) for rich mobile control
+- voice automations and LLM wrappers (`voice/`) for natural-language control
+
+## Quick start (core brain)
 
 ```bash
 cd snoozefest
@@ -43,6 +48,26 @@ For persistent deployment on Home Assistant:
 When deployed as an add-on, Snoozefest typically publishes to the `snoozefest` MQTT namespace.
 
 Both dev and production instances can coexist without conflict.
+
+## How to adopt in phases
+
+### Phase 1: Brain only (recommended starting point)
+
+- Install and run Snoozefest.
+- Create alarms/timers from manager entities.
+- Control everything from MQTT-discovered entities.
+
+### Phase 2: Dashboard UI (optional)
+
+- Add card resources from `dashboard/`.
+- Import list/detail card YAML.
+- Use the Snoozefest custom card for compact mobile-friendly control.
+
+### Phase 3: Voice control (optional)
+
+- Import the router automation/script and ringing announce automation.
+- Optionally expose LLM-friendly wrapper scripts for natural-language control.
+- Keep deterministic execution through Snoozefest command routes.
 
 ## Operating model
 
@@ -211,14 +236,28 @@ Dashboard YAML files and the custom time picker card are now grouped under `dash
 | `dashboard/time_picker_custom.js` | Legacy compatible custom Lovelace card kept for migration/backward compatibility |
 | `dashboard/input_text.js` | Custom Lovelace multiline text input card |
 
-## Voice automations
+## Voice automations and scripts
 
-Voice-related Home Assistant automations are grouped under `voice/`:
+Voice assets are grouped under `voice/`.
+
+Main deterministic flow:
 
 | File | Purpose |
 |---|---|
-| `voice/ha_voice_master_automation.yaml` | Conversation routing automation for voice alarm/timer intents |
-| `voice/ha_voice_ringing_announce_automation.yaml` | Satellite announcement automation for ringing alarms/timers |
-| `voice/ha_voice_router.yaml` | Script-style MQTT command router used by voice flows |
+| `voice/snoozefest_va_router_automation.yaml` | Sentence-based voice router automation |
+| `voice/snoozefest_va_router_script.yaml` | MQTT command router script used by voice flows |
+| `voice/snoozefest_va_ringing_automation.yaml` | Ringing announcement automation |
+
+LLM wrapper scripts (optional, tool-friendly):
+
+| File | Purpose |
+|---|---|
+| `voice/snoozefest_va_set_timer_llm_script.yaml` | Explicit LLM wrapper for timer creation |
+| `voice/snoozefest_va_set_alarm_llm_script.yaml` | Explicit LLM wrapper for alarm creation |
+| `voice/snoozefest_va_add_time_llm_script.yaml` | Explicit LLM wrapper for adding time to timers |
+| `voice/snoozefest_va_snooze_alarm_llm_script.yaml` | Explicit LLM wrapper for alarm snooze |
+| `voice/snoozefest_va_dismiss_llm_script.yaml` | Explicit LLM wrapper for dismissing ringing alarms/timers |
+| `voice/snoozefest_va_llm_instructions.md` | Stable LLM instruction profile |
+| `voice/snoozefest_va_llm_instructions_test.md` | Aggressive override profile for intent-collision testing |
 
 For future UI consolidation, helper-removal planning, and the longer-term move toward a fully Snoozefest-owned detail card stack, see `TIMER_UI_ROADMAP.md`.
