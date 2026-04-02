@@ -31,9 +31,8 @@ Use the quick start setup above for testing and local development. The MQTT name
 
 For persistent deployment on Home Assistant:
 
-1. Navigate to `../ha-addons/snoozefest/` folder
-2. Follow [../ha-addons/snoozefest/README.md](../ha-addons/snoozefest/README.md) for installation
-3. See [MIGRATION.md](MIGRATION.md) for importing dev state to production
+1. Navigate to https://github.com/stefhartog/ha-addons
+2. Follow instructions
 
 When deployed as an add-on, Snoozefest typically publishes to the `snoozefest` MQTT namespace.
 
