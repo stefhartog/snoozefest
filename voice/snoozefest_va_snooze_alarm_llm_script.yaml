@@ -1,0 +1,58 @@
+alias: LLM Script for Snoozefest snooze-alarm requests
+description: >-
+  LLM-facing wrapper for snoozing Snoozefest alarms. This script is
+  intentionally explicit so an LLM can fill structured fields reliably, while
+  execution still goes through the existing Snoozefest voice router.
+mode: parallel
+max_exceeded: silent
+fields:
+  alarm_id:
+    selector:
+      text: null
+    name: Alarm ID
+    description: >-
+      Optional alarm id (numeric string like 1, 2, 3). If omitted, snooze is
+      applied globally to ringing alarms.
+    required: false
+  request_description:
+    selector:
+      text: null
+    name: Request Description
+    description: >-
+      Mandatory. Short plain-language description of the user request, useful
+      for logging and debugging. Example: snooze the ringing alarm for
+      15 minutes.
+    required: true
+  request_id:
+    selector:
+      text: null
+    name: Request ID
+    description: Optional unique request id. If omitted, the script generates one.
+sequence:
+  - variables:
+      normalized_alarm_id: "{{ alarm_id | default('', true) | string | trim }}"
+      normalized_request_id: >-
+        {{ request_id | default('llm_snooze_alarm_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
+      ringing_alarm_count: >-
+        {{
+          states
+          | selectattr('entity_id', 'search', '^sensor\\.snoozefest_alarm_\\d+_status$')
+          | selectattr('state', 'eq', 'Ringing')
+          | list
+          | count
+        }}
+      no_ringing_response:
+        response: No alarms are ringing to snooze.
+  - if:
+      - condition: template
+        value_template: "{{ ringing_alarm_count | int(0) == 0 }}"
+    then:
+      - stop: No ringing alarms available
+        response_variable: no_ringing_response
+  - alias: Forward structured snooze-alarm request to Snoozefest router
+    service: script.snoozefest_voice_router
+    data:
+      action: snooze_alarm
+      alarm_id: "{{ normalized_alarm_id }}"
+      request_id: "{{ normalized_request_id }}"
+  - sequence: []

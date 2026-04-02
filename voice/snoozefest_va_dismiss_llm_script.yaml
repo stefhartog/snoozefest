@@ -1,0 +1,98 @@
+alias: LLM Script for Snoozefest dismiss requests
+description: >-
+  LLM-facing wrapper for dismissing currently ringing Snoozefest alarms and/or
+  timers. This script only targets entities in Ringing status.
+mode: parallel
+max_exceeded: silent
+fields:
+  request_description:
+    selector:
+      text: null
+    name: Request Description
+    description: Optional short plain-language summary for debugging.
+    required: false
+  request_id:
+    selector:
+      text: null
+    name: Request ID
+    description: Optional unique request id. Generated when omitted.
+    required: false
+  mqtt_prefix:
+    selector:
+      text: null
+    name: MQTT Prefix
+    description: Optional Snoozefest prefix. Defaults to snoozefest.
+    required: false
+sequence:
+  - variables:
+      prefix: "{{ mqtt_prefix | default('snoozefest', true) | string | trim }}"
+      ringing_alarm_ids: >-
+        {% set ns = namespace(ids=[]) %}
+        {% for s in states.sensor %}
+          {% if s.entity_id is match('^sensor\\.' ~ prefix ~ '_alarm_\\d+_status$') and (s.state | lower) == 'ringing' %}
+            {% set sid = (s.entity_id | regex_findall('alarm_(\\d+)_status') | first | default('', true)) %}
+            {% if sid != '' %}
+              {% set ns.ids = ns.ids + [sid | int] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.ids }}
+      ringing_timer_ids: >-
+        {% set ns = namespace(ids=[]) %}
+        {% for s in states.sensor %}
+          {% if s.entity_id is match('^sensor\\.' ~ prefix ~ '_timer_\\d+_status$') and (s.state | lower) == 'ringing' %}
+            {% set sid = (s.entity_id | regex_findall('timer_(\\d+)_status') | first | default('', true)) %}
+            {% if sid != '' %}
+              {% set ns.ids = ns.ids + [sid | int] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.ids }}
+      alarm_count: "{{ ringing_alarm_ids | count }}"
+      timer_count: "{{ ringing_timer_ids | count }}"
+      normalized_request_id: >-
+        {{ request_id | default('llm_dismiss_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
+      none_response:
+        response: Nothing is ringing.
+  - if:
+      - condition: template
+        value_template: "{{ (alarm_count | int(0)) < 1 and (timer_count | int(0)) < 1 }}"
+    then:
+      - stop: No ringing alarms or timers
+        response_variable: none_response
+  - if:
+      - condition: template
+        value_template: "{{ (alarm_count | int(0)) > 0 }}"
+    then:
+      - repeat:
+          for_each: "{{ ringing_alarm_ids }}"
+          sequence:
+            - service: script.snoozefest_voice_router
+              data:
+                action: dismiss_alarm
+                alarm_id: "{{ repeat.item }}"
+                request_id: "{{ normalized_request_id ~ '_a_' ~ repeat.item }}"
+  - if:
+      - condition: template
+        value_template: "{{ (timer_count | int(0)) > 0 }}"
+    then:
+      - repeat:
+          for_each: "{{ ringing_timer_ids }}"
+          sequence:
+            - service: script.snoozefest_voice_router
+              data:
+                action: dismiss_timer
+                timer_id: "{{ repeat.item }}"
+                request_id: "{{ normalized_request_id ~ '_t_' ~ repeat.item }}"
+  - variables:
+      ok_response:
+        response: >-
+          {% if (alarm_count | int(0)) > 0 and (timer_count | int(0)) > 0 %}
+            Dismissed ringing alarms and timers.
+          {% elif (alarm_count | int(0)) > 0 %}
+            Dismissed ringing alarms.
+          {% else %}
+            Dismissed ringing timers.
+          {% endif %}
+  - stop: Dismiss handled
+    response_variable: ok_response

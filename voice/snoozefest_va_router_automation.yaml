@@ -199,33 +199,34 @@ action:
           - variables:
               op_request_id: "vm_snooze_alarm_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
               requested_snooze_minutes: "{{ trigger.slots.snooze_minutes | default(trigger.slots.minutes | default('')) }}"
+              ringing_alarm_count: >-
+                {{
+                  states.sensor
+                  | selectattr('entity_id', 'match', '^sensor\\.' ~ mqtt_prefix ~ '_alarm_\\d+_status$')
+                  | selectattr('state', 'eq', 'Ringing')
+                  | list
+                  | count
+                }}
           - service: script.snoozefest_voice_router
             data:
               action: snooze_alarm
               snooze_minutes: "{{ requested_snooze_minutes }}"
               request_id: "{{ op_request_id }}"
-          - wait_for_trigger:
-              - platform: mqtt
-                topic: "{{ mqtt_prefix }}/state/command_result"
-                value_template: "{{ value_json.command == 'alarm/snooze' and (value_json.request_id | default('')) == op_request_id }}"
-            timeout: "00:00:04"
-            continue_on_timeout: true
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                    value_template: "{{ (ringing_alarm_count | int(0)) > 0 }}"
                 sequence:
                   - set_conversation_response: >-
-                      {{ wait.trigger.payload_json.message | default('Snoozing.') }}
-              - conditions:
-                  - condition: template
-                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
-                sequence:
-                  - set_conversation_response: >-
-                      {{ wait.trigger.payload_json.message | default('No alarms are ringing to snooze.') }}
+                      {% set m = requested_snooze_minutes | int(0) %}
+                      {% if m > 0 %}
+                        Snoozing for {{ m }} minute{{ '' if m == 1 else 's' }}.
+                      {% else %}
+                        Snoozing.
+                      {% endif %}
             default:
               - set_conversation_response: >-
-                  I sent the snooze command.
+                  No alarms are ringing to snooze.
 
       - conditions:
           - condition: trigger
@@ -234,32 +235,28 @@ action:
         sequence:
           - variables:
               op_request_id: "vm_dismiss_timer_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
+              modifiable_timer_count: >-
+                {{
+                  states.sensor
+                  | selectattr('entity_id', 'match', '^sensor\\.' ~ mqtt_prefix ~ '_timer_\\d+_status$')
+                  | selectattr('state', 'in', ['Active', 'Paused', 'Ringing'])
+                  | list
+                  | count
+                }}
           - service: script.snoozefest_voice_router
             data:
               action: dismiss_timer
               request_id: "{{ op_request_id }}"
-          - wait_for_trigger:
-              - platform: mqtt
-                topic: "{{ mqtt_prefix }}/state/command_result"
-                value_template: "{{ value_json.command == 'timer/dismiss' and (value_json.request_id | default('')) == op_request_id }}"
-            timeout: "00:00:04"
-            continue_on_timeout: true
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                    value_template: "{{ (modifiable_timer_count | int(0)) > 0 }}"
                 sequence:
                   - set_conversation_response: >-
                       Dismissed.
-              - conditions:
-                  - condition: template
-                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
-                sequence:
-                  - set_conversation_response: >-
-                      No timer found in Active, Snoozed, or Ringing state to dismiss.
             default:
               - set_conversation_response: >-
-                  I sent the dismiss command.
+                  No timer found in Active, Paused, or Ringing state to dismiss.
 
       - conditions:
           - condition: trigger
@@ -269,33 +266,34 @@ action:
           - variables:
               op_request_id: "vm_snooze_timer_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
               requested_add_minutes: "{{ trigger.slots.minutes | default(trigger.slots.snooze_minutes | default('')) }}"
+              modifiable_timer_count: >-
+                {{
+                  states.sensor
+                  | selectattr('entity_id', 'match', '^sensor\\.' ~ mqtt_prefix ~ '_timer_\\d+_status$')
+                  | selectattr('state', 'in', ['Active', 'Paused', 'Ringing'])
+                  | list
+                  | count
+                }}
           - service: script.snoozefest_voice_router
             data:
               action: snooze_timer
               minutes: "{{ requested_add_minutes }}"
               request_id: "{{ op_request_id }}"
-          - wait_for_trigger:
-              - platform: mqtt
-                topic: "{{ mqtt_prefix }}/state/command_result"
-                value_template: "{{ value_json.command == 'timer/snooze' and (value_json.request_id | default('')) == op_request_id }}"
-            timeout: "00:00:04"
-            continue_on_timeout: true
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ wait.trigger is not none and (wait.trigger.payload_json.success | default(false)) }}"
+                    value_template: "{{ (modifiable_timer_count | int(0)) > 0 }}"
                 sequence:
                   - set_conversation_response: >-
-                      Snoozing.
-              - conditions:
-                  - condition: template
-                    value_template: "{{ wait.trigger is not none and not (wait.trigger.payload_json.success | default(false)) }}"
-                sequence:
-                  - set_conversation_response: >-
-                      No timer found in Ringing state to snooze.
+                      {% set m = requested_add_minutes | int(0) %}
+                      {% if m > 0 %}
+                        Adding {{ m }} minute{{ '' if m == 1 else 's' }}.
+                      {% else %}
+                        Adding time.
+                      {% endif %}
             default:
               - set_conversation_response: >-
-                  I sent the snooze command.
+                  No timer found in Active, Paused, or Ringing state to snooze.
 
     default:
       - service: persistent_notification.create

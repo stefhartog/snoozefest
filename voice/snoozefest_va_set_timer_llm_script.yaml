@@ -1,0 +1,121 @@
+alias: LLM Script for Snoozefest timer requests
+description: >-
+  LLM-facing wrapper for setting Snoozefest timers. This script exposes explicit
+  fields for tool-calling and normalizes duration input before forwarding to
+  script.snoozefest_voice_router (action: set_timer).
+mode: parallel
+max_exceeded: silent
+fields:
+  duration_minutes:
+    selector:
+      number:
+        min: 1
+        max: 1440
+        unit_of_measurement: min
+        mode: box
+    name: Duration Minutes
+    description: >-
+      Preferred numeric duration in whole minutes. Example: 30 for a 30 minute
+      timer, 90 for 1 hour 30 minutes.
+    required: false
+  duration_text:
+    selector:
+      text: null
+    name: Duration Text
+    description: >-
+      Fallback natural-language duration. Examples: "30 minutes", "1 hour 15
+      minutes", "90 seconds".
+    required: false
+  label:
+    selector:
+      text: null
+    name: Label
+    description: >-
+      Optional timer label. Use empty string when no label is requested.
+    required: true
+  temporary:
+    selector:
+      boolean: null
+    name: Temporary
+    description: >-
+      Optional. True only when the user explicitly requests a temporary timer.
+    required: false
+  request_description:
+    selector:
+      text: null
+    name: Request Description
+    description: >-
+      Optional short plain-language summary of the request for debugging.
+    required: false
+  request_id:
+    selector:
+      text: null
+    name: Request ID
+    description: Optional unique request id. Generated when omitted.
+    required: false
+sequence:
+  - variables:
+      duration_num: "{{ duration_minutes | int(0) if duration_minutes is defined else 0 }}"
+      duration_text_clean: "{{ duration_text | default('', true) | string | trim }}"
+      duration_raw: >-
+        {% if duration_num > 0 %}
+          {{ duration_num }}
+        {% else %}
+          {{ duration_text_clean }}
+        {% endif %}
+      duration_compact: >-
+        {{ (duration_raw | string | lower | trim)
+           | replace(',', ' ')
+           | replace(' and ', ' ')
+           | replace('-', ' ') }}
+      matched_hours: >-
+        {{ (duration_compact
+            | regex_findall('([0-9]+(?:\.[0-9]+)?)\s*(?:h|hr|hrs|hour|hours)')
+            | first
+            | default('', true)) }}
+      matched_minutes: >-
+        {{ (duration_compact
+            | regex_findall('([0-9]+(?:\.[0-9]+)?)\s*(?:m|min|mins|minute|minutes)')
+            | first
+            | default('', true)) }}
+      matched_seconds: >-
+        {{ (duration_compact
+            | regex_findall('([0-9]+(?:\.[0-9]+)?)\s*(?:s|sec|secs|second|seconds)')
+            | first
+            | default('', true)) }}
+      normalized_minutes: >-
+        {% if duration_num > 0 %}
+          {{ duration_num }}
+        {% else %}
+          {% set h = matched_hours | float(0) %}
+          {% set m = matched_minutes | float(0) %}
+          {% set s = matched_seconds | float(0) %}
+          {% if h > 0 or m > 0 or s > 0 %}
+            {{ ((h * 60) + m + (s / 60)) | round(0, 'ceil') | int }}
+          {% else %}
+            {% set plain = duration_compact | regex_replace('[^0-9.]', '') | float(0) %}
+            {{ plain | int(0) }}
+          {% endif %}
+        {% endif %}
+      normalized_label: "{{ label | default('', true) | string | trim }}"
+      normalized_temporary: "{{ temporary | default(false, true) | bool(false) }}"
+      normalized_request_id: >-
+        {{ request_id | default('llm_timer_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
+      invalid_response:
+        response: Duration must be at least 1 minute.
+  - if:
+      - condition: template
+        value_template: "{{ normalized_minutes < 1 }}"
+    then:
+      - stop: Invalid timer duration provided
+        response_variable: invalid_response
+  - alias: Forward structured timer request to Snoozefest router
+    service: script.snoozefest_voice_router
+    data:
+      action: set_timer
+      minutes: "{{ normalized_minutes }}"
+      duration_text: "{{ duration_raw | default(normalized_minutes, true) }}"
+      label: "{{ normalized_label }}"
+      temporary: "{{ normalized_temporary }}"
+      request_id: "{{ normalized_request_id }}"
+  - sequence: []

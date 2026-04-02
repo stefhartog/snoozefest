@@ -684,7 +684,7 @@
 
 			if (ALARM_REMAINING_RE.test(displayEntity)) {
 				const timeEntity = displayEntity.replace(/^sensor\./, 'text.').replace(/_remaining(?:_friendly)?$/, '_time');
-				if (status !== 'snoozed' && this._hass.states[timeEntity]) {
+				if (this._hass.states[timeEntity]) {
 					return timeEntity;
 				}
 			}
@@ -993,6 +993,24 @@
 					seconds: timerParts[3],
 				};
 				return visibleKeys.map((key) => timerMap[key] || '');
+			}
+
+			if (ALARM_REMAINING_RE.test(String(entityId || '')) && rawParts.length <= 1) {
+				const totalSeconds = parseInt(this._digitsOnly(raw), 10);
+				if (Number.isFinite(totalSeconds)) {
+					const clamped = Math.max(0, totalSeconds);
+					const days = Math.floor(clamped / 86400);
+					const hours = Math.floor((clamped % 86400) / 3600);
+					const minutes = Math.floor((clamped % 3600) / 60);
+					const seconds = clamped % 60;
+					const alarmMap = {
+						days: String(days).padStart(2, '0'),
+						hours: String(hours).padStart(2, '0'),
+						minutes: String(minutes).padStart(2, '0'),
+						seconds: String(seconds).padStart(2, '0'),
+					};
+					return visibleKeys.map((key) => alarmMap[key] || '');
+				}
 			}
 
 			return visibleKeys.map((key, index) => {

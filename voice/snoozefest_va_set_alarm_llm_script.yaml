@@ -1,0 +1,72 @@
+alias: LLM Script for Snoozefest alarm requests
+description: >-
+  LLM-facing wrapper for setting Snoozefest alarms. This script is intentionally
+  explicit so an LLM can fill structured fields reliably, while execution still
+  goes through the existing Snoozefest voice router.
+mode: parallel
+max_exceeded: silent
+fields:
+  alarm_time:
+    selector:
+      text: null
+    name: Alarm Time
+    description: >-
+      Mandatory. Alarm time in natural or clock form. Always provide this field.
+      Examples: 07:30, 7:30 am, 19:45. If the user says only an hour, include
+      minutes as 00 when possible.
+    required: true
+  label:
+    selector:
+      text: null
+    name: Label
+    description: >-
+      Optional alarm label. Use a short natural label only if the user clearly
+      asked for one. If no label was requested or implied, provide an empty
+      string.
+    required: true
+  temporary:
+    selector:
+      boolean: null
+    name: Temporary
+    description: >-
+      Mandatory. Set to true only if the user explicitly asks for a temporary
+      alarm. Otherwise set to false.
+    required: true
+  request_description:
+    selector:
+      text: null
+    name: Request Description
+    description: >-
+      Mandatory. Short plain-language description of the user request, useful
+      for logging and debugging. Example: set an alarm for tomorrow at 7:30.
+    required: true
+  request_id:
+    selector:
+      text: null
+    name: Request ID
+    description: >-
+      Optional unique request id. If omitted, the script generates one.
+sequence:
+  - variables:
+      normalized_time: "{{ alarm_time | default('', true) | string | trim }}"
+      normalized_label: "{{ label | default('', true) | string | trim }}"
+      normalized_temporary: "{{ temporary | default(false, true) | bool(false) }}"
+      normalized_request_id: >-
+        {{ request_id | default('llm_alarm_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
+      invalid_response:
+        response: Alarm Time is required.
+  - if:
+      - condition: template
+        value_template: "{{ normalized_time == '' }}"
+    then:
+      - stop: Invalid alarm time provided
+        response_variable: invalid_response
+  - alias: Forward structured alarm request to Snoozefest router
+    service: script.snoozefest_voice_router
+    data:
+      action: set_alarm
+      time: "{{ normalized_time }}"
+      label: "{{ normalized_label }}"
+      temporary: "{{ normalized_temporary }}"
+      request_id: "{{ normalized_request_id }}"
+  - sequence: []
