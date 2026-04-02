@@ -615,10 +615,10 @@
 		}
 	}
 
-	if (!customElements.get('lovelace-multiline-text-input-card')) {
-		customElements.define('lovelace-multiline-text-input-card', LovelaceMultilineTextInput);
+	if (!customElements.get('snoozefest-multiline-text-input-card')) {
+		customElements.define('snoozefest-multiline-text-input-card', LovelaceMultilineTextInput);
 		console.info(
-			`%c  multiline-text-input-card \n%c  version: ${version}    `,
+			`%c  snoozefest-multiline-text-input-card \n%c  version: ${version}    `,
 			'color: orange; font-weight: bold; background: black',
 			'color: white; font-weight: bold; background: dimgray',
 		);

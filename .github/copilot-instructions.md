@@ -73,7 +73,7 @@ Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
 - `dashboard/alarm_list_card.yaml` — auto-entities list of all alarms
 - `dashboard/timer_list_card.yaml` — auto-entities list of all timers using `custom:snoozefest-time-picker-card` rows
 - `dashboard/alarm_detail_card.yaml` — single alarm detail popup card
-- `dashboard/input_text.js` — custom multiline text input card used by detail popups
+- `dashboard/snoozefest_multiline_text_input.js` — custom multiline text input card used by detail popups
   - Uses `custom:config-template-card`; `vars[0]` holds the alarm ID string
   - All entity IDs are hard-coded to the `snoozefest_*` prefix
   - **KNOWN BROKEN**: Using `vars[1]` as an MQTT prefix variable breaks this card when
@@ -86,10 +86,6 @@ Timer sensors follow a similar pattern (`09a`, `09b`, etc.).
 - `dashboard/timer_detail_card.yaml` currently uses `custom:config-template-card` + conditionals.
 - Keep changes conservative: avoid aggressive inline JS templating refactors in this YAML card; prior attempts caused non-rendering states.
 - Prefer roadmap-driven consolidation into dedicated JS cards (`TIMER_UI_ROADMAP.md`) rather than forcing complex logic into YAML.
-
-### Custom card naming note
-- `dashboard/time_picker_custom.js` has grown beyond a pure time picker.
-- Plan naming cleanup during JS-card migration (with compatibility alias to avoid breaking existing dashboards).
 
 ### Voice automations (`voice/`)
 - `voice/ha_voice_master_automation.yaml` — Assist conversation trigger router

@@ -51,7 +51,7 @@ card:
           columns: 2
           square: false
           cards:
-            - type: custom:lovelace-multiline-text-input-card
+            - type: custom:snoozefest-multiline-text-input-card
               autosave: true
               entity: ${'text.' + vars[0] + '_label'}
               max_length: 12
