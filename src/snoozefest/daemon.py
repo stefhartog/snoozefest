@@ -152,6 +152,54 @@ class Daemon:
             "icon": "mdi:delete-sweep",
             "device": self._root_device(),
         }
+        snooze_all_alarms_payload = {
+            "name": "Snooze All Ringing Alarms",
+            "unique_id": self._manager_snooze_all_alarms_object_id(),
+            "object_id": self._manager_snooze_all_alarms_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/alarm/snooze",
+            "payload_press": "{}",
+            "icon": "mdi:alarm-snooze",
+            "device": self._root_device(),
+        }
+        dismiss_all_alarms_payload = {
+            "name": "Dismiss All Alarms",
+            "unique_id": self._manager_dismiss_all_alarms_object_id(),
+            "object_id": self._manager_dismiss_all_alarms_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/alarm/dismiss",
+            "payload_press": "{}",
+            "icon": "mdi:alarm-off",
+            "device": self._root_device(),
+        }
+        snooze_all_timers_payload = {
+            "name": "Snooze All Timers",
+            "unique_id": self._manager_snooze_all_timers_object_id(),
+            "object_id": self._manager_snooze_all_timers_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/snooze",
+            "payload_press": "{}",
+            "icon": "mdi:timer-sand-complete",
+            "device": self._root_device(),
+        }
+        dismiss_all_timers_payload = {
+            "name": "Dismiss All Timers",
+            "unique_id": self._manager_dismiss_all_timers_object_id(),
+            "object_id": self._manager_dismiss_all_timers_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/timer/dismiss",
+            "payload_press": "{}",
+            "icon": "mdi:timer-off",
+            "device": self._root_device(),
+        }
         online_payload = {
             "name": "Online",
             "unique_id": self._manager_online_object_id(),
@@ -248,6 +296,10 @@ class Daemon:
         self._mqtt.publish(self._manager_add_alarm_discovery_topic(), add_alarm_payload, retain=True)
         self._mqtt.publish(self._manager_add_timer_discovery_topic(), add_timer_payload, retain=True)
         self._mqtt.publish(self._manager_purge_all_discovery_topic(), purge_all_payload, retain=True)
+        self._mqtt.publish(self._manager_snooze_all_alarms_discovery_topic(), snooze_all_alarms_payload, retain=True)
+        self._mqtt.publish(self._manager_dismiss_all_alarms_discovery_topic(), dismiss_all_alarms_payload, retain=True)
+        self._mqtt.publish(self._manager_snooze_all_timers_discovery_topic(), snooze_all_timers_payload, retain=True)
+        self._mqtt.publish(self._manager_dismiss_all_timers_discovery_topic(), dismiss_all_timers_payload, retain=True)
         self._mqtt.publish(self._manager_online_discovery_topic(), online_payload, retain=True)
         self._mqtt.publish(self._manager_ringing_alarm_count_discovery_topic(), ringing_alarm_count_payload, retain=True)
         self._mqtt.publish(self._manager_ringing_timer_count_discovery_topic(), ringing_timer_count_payload, retain=True)
@@ -345,6 +397,42 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
             f"{self._manager_purge_all_object_id()}/config"
+        )
+
+    def _manager_snooze_all_alarms_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_snooze_all_alarms"
+
+    def _manager_snooze_all_alarms_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._manager_snooze_all_alarms_object_id()}/config"
+        )
+
+    def _manager_dismiss_all_alarms_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_dismiss_all_alarms"
+
+    def _manager_dismiss_all_alarms_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._manager_dismiss_all_alarms_object_id()}/config"
+        )
+
+    def _manager_snooze_all_timers_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_snooze_all_timers"
+
+    def _manager_snooze_all_timers_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._manager_snooze_all_timers_object_id()}/config"
+        )
+
+    def _manager_dismiss_all_timers_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_dismiss_all_timers"
+
+    def _manager_dismiss_all_timers_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._manager_dismiss_all_timers_object_id()}/config"
         )
 
     def _manager_online_object_id(self) -> str:
