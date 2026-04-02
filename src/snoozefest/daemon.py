@@ -206,6 +206,28 @@ class Daemon:
             "icon": "mdi:format-list-bulleted",
             "device": self._root_device(),
         }
+        next_alarm_payload = {
+            "name": "Next Alarm",
+            "unique_id": self._manager_next_alarm_object_id(),
+            "object_id": self._manager_next_alarm_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": f"{self._config.mqtt_topic_prefix}/state/next_alarm",
+            "value_template": (
+                "{% if value_json and value_json.time_local is defined %}"
+                "{{ value_json.time_local }}"
+                "{% else %}unknown{% endif %}"
+            ),
+            "json_attributes_topic": f"{self._config.mqtt_topic_prefix}/state/next_alarm",
+            "json_attributes_template": (
+                "{% if value_json %}{{ value_json | tojson }}"
+                "{% else %}{{ dict() | tojson }}{% endif %}"
+            ),
+            "device_class": "timestamp",
+            "icon": "mdi:alarm",
+            "device": self._root_device(),
+        }
         timer_add_seconds_payload = {
             "name": "Timer Add Time Seconds",
             "unique_id": self._manager_timer_add_seconds_object_id(),
@@ -231,6 +253,7 @@ class Daemon:
         self._mqtt.publish(self._manager_ringing_timer_count_discovery_topic(), ringing_timer_count_payload, retain=True)
         self._mqtt.publish(self._manager_alarms_glance_discovery_topic(), alarms_glance_payload, retain=True)
         self._mqtt.publish(self._manager_timers_glance_discovery_topic(), timers_glance_payload, retain=True)
+        self._mqtt.publish(self._manager_next_alarm_discovery_topic(), next_alarm_payload, retain=True)
         self._mqtt.publish(self._manager_timer_add_seconds_discovery_topic(), timer_add_seconds_payload, retain=True)
         self._mqtt.publish(self._manager_timer_add_seconds_state_topic(), str(self._timer_add_seconds), retain=True)
 
@@ -367,6 +390,15 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
             f"{self._manager_timers_glance_object_id()}/config"
+        )
+
+    def _manager_next_alarm_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_next_alarm"
+
+    def _manager_next_alarm_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._manager_next_alarm_object_id()}/config"
         )
 
     def _manager_timer_add_seconds_object_id(self) -> str:
