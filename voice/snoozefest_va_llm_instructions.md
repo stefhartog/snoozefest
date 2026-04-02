@@ -92,10 +92,12 @@ Always call:
 - entity: `script.snoozefest_va_snooze_alarm_llm_script`
 - data:
   - `alarm_id`: optional
+  - `snooze_minutes`: integer whole minutes only when the snooze request is confidently minute-based
+  - `snooze_duration_text`: original snooze phrase for richer or uncertain durations, including seconds and mixed wording like `90 seconds` or `two minutes`
   - `request_description`: short summary
   - `request_id`: unique string
 
-Do not ask for snooze duration in this test profile; use Snoozefest default.
+If the user explicitly gives a snooze duration, pass it through. If they do not, do not ask for one in this test profile; use Snoozefest default.
 
 ### Dismiss/silence ringing alarms or timers
 

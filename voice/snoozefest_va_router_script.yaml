@@ -53,6 +53,7 @@ sequence:
       timer_label: "{{ label | default('Voice Timer') }}"
       duration_text_raw: "{{ duration_text | default(minutes | default('')) }}"
       add_duration_text_raw: "{{ add_duration_text | default(duration_text | default('')) }}"
+      snooze_duration_text_raw: "{{ snooze_duration_text | default(duration_text | default(snooze_minutes | default(minutes | default('')))) }}"
       snooze_minutes_raw: "{{ snooze_minutes | default(minutes | default('')) }}"
       snooze_minutes: >-
         {% set raw = (snooze_minutes_raw | string | lower | trim) %}
@@ -111,6 +112,7 @@ sequence:
                 {% set base = {'request_id': request_id} %}
                 {% set base = base | combine({'id': alarm_id}) if alarm_id is defined and alarm_id else base %}
                 {% set base = base | combine({'minutes': (snooze_minutes | int)}) if (snooze_minutes | int(0)) > 0 else base %}
+                {% set base = base | combine({'duration_text': snooze_duration_text_raw}) if (snooze_duration_text_raw | string | trim) != '' else base %}
                 {{ base | tojson }}
 
       - conditions: "{{ action_name == 'dismiss_alarm' }}"

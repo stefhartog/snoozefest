@@ -70,15 +70,20 @@ trigger:
       - snooze the alarm
       - snooze alarm for {snooze_minutes} minutes
       - snooze alarm for {snooze_minutes} minute
+      - snooze alarm for {duration}
       - snooze for {snooze_minutes} minutes
       - snooze for {snooze_minutes} minute
+      - snooze for {duration}
       - snooze it for {snooze_minutes} minutes
       - snooze it for {snooze_minutes} minute
+      - snooze it for {duration}
       # More conversational extensions
       - give me {snooze_minutes} more minutes
       - give me {snooze_minutes} more minute
+      - give me {duration} more
       - wake me again in {snooze_minutes} minutes
       - wake me again in {snooze_minutes} minute
+      - wake me again in {duration}
 
   - id: dismiss_timer
     platform: conversation
@@ -101,17 +106,23 @@ trigger:
       - snooze the timer
       - snooze timer for {minutes} minutes
       - snooze timer for {minutes} minute
+      - snooze timer for {duration}
       - add {minutes} minutes to timer
       - add {minutes} minute to timer
+      - add {duration} to timer
       - add {minutes} more minutes to timer
       - add {minutes} more minute to timer
+      - add {duration} more to timer
       # More conversational extensions
       - give it {minutes} more minutes
       - give it {minutes} more minute
+      - give it {duration} more
       - extend the timer by {minutes} minutes
       - extend the timer by {minutes} minute
+      - extend the timer by {duration}
       - add another {minutes} minutes to the timer
       - add another {minutes} minute to the timer
+      - add another {duration} to the timer
 
 
 action:
@@ -257,7 +268,20 @@ action:
         sequence:
           - variables:
               op_request_id: "vm_snooze_alarm_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
-              requested_snooze_minutes: "{{ trigger.slots.snooze_minutes | default(trigger.slots.minutes | default('')) }}"
+              requested_snooze_amount: >-
+                {{ trigger.slots.duration | default(trigger.slots.snooze_minutes | default(trigger.slots.minutes | default(''))) }}
+              requested_snooze_response: >-
+                {% set raw = trigger.slots.duration | default('', true) | string | trim %}
+                {% if raw != '' %}
+                  {{ raw }}
+                {% else %}
+                  {% set m = trigger.slots.snooze_minutes | default(trigger.slots.minutes | default('')) | int(0) %}
+                  {% if m > 0 %}
+                    {{ m }} minute{{ '' if m == 1 else 's' }}
+                  {% else %}
+                    
+                  {% endif %}
+                {% endif %}
               ringing_alarm_count: >-
                 {{
                   states.sensor
@@ -269,7 +293,7 @@ action:
           - service: script.snoozefest_voice_router
             data:
               action: snooze_alarm
-              snooze_minutes: "{{ requested_snooze_minutes }}"
+              duration_text: "{{ requested_snooze_amount }}"
               request_id: "{{ op_request_id }}"
           - choose:
               - conditions:
@@ -277,9 +301,8 @@ action:
                     value_template: "{{ (ringing_alarm_count | int(0)) > 0 }}"
                 sequence:
                   - set_conversation_response: >-
-                      {% set m = requested_snooze_minutes | int(0) %}
-                      {% if m > 0 %}
-                        Snoozing for {{ m }} minute{{ '' if m == 1 else 's' }}.
+                      {% if requested_snooze_response | trim != '' %}
+                        Snoozing for {{ requested_snooze_response | trim }}.
                       {% else %}
                         Snoozing.
                       {% endif %}
@@ -324,7 +347,20 @@ action:
         sequence:
           - variables:
               op_request_id: "vm_snooze_timer_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
-              requested_add_minutes: "{{ trigger.slots.minutes | default(trigger.slots.snooze_minutes | default('')) }}"
+              requested_add_amount: >-
+                {{ trigger.slots.duration | default(trigger.slots.minutes | default(trigger.slots.snooze_minutes | default(''))) }}
+              requested_add_response: >-
+                {% set raw = trigger.slots.duration | default('', true) | string | trim %}
+                {% if raw != '' %}
+                  {{ raw }}
+                {% else %}
+                  {% set m = trigger.slots.minutes | default(trigger.slots.snooze_minutes | default('')) | int(0) %}
+                  {% if m > 0 %}
+                    {{ m }} minute{{ '' if m == 1 else 's' }}
+                  {% else %}
+                    
+                  {% endif %}
+                {% endif %}
               modifiable_timer_count: >-
                 {{
                   states.sensor
@@ -336,7 +372,7 @@ action:
           - service: script.snoozefest_voice_router
             data:
               action: snooze_timer
-              minutes: "{{ requested_add_minutes }}"
+              duration_text: "{{ requested_add_amount }}"
               request_id: "{{ op_request_id }}"
           - choose:
               - conditions:
@@ -344,9 +380,8 @@ action:
                     value_template: "{{ (modifiable_timer_count | int(0)) > 0 }}"
                 sequence:
                   - set_conversation_response: >-
-                      {% set m = requested_add_minutes | int(0) %}
-                      {% if m > 0 %}
-                        Adding {{ m }} minute{{ '' if m == 1 else 's' }}.
+                      {% if requested_add_response | trim != '' %}
+                        Adding {{ requested_add_response | trim }}.
                       {% else %}
                         Adding time.
                       {% endif %}

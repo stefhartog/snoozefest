@@ -14,6 +14,26 @@ fields:
       Optional alarm id (numeric string like 1, 2, 3). If omitted, snooze is
       applied globally to ringing alarms.
     required: false
+  snooze_minutes:
+    selector:
+      number:
+        min: 1
+        max: 240
+        unit_of_measurement: min
+        mode: box
+    name: Snooze Minutes
+    description: >-
+      Optional numeric snooze duration in whole minutes when confidently
+      minute-based.
+    required: false
+  snooze_duration_text:
+    selector:
+      text: null
+    name: Snooze Duration Text
+    description: >-
+      Optional natural-language snooze duration. Examples: "90 seconds", "2
+      minutes", "two minutes".
+    required: false
   request_description:
     selector:
       text: null
@@ -31,6 +51,16 @@ fields:
 sequence:
   - variables:
       normalized_alarm_id: "{{ alarm_id | default('', true) | string | trim }}"
+      normalized_snooze_minutes: "{{ snooze_minutes | int(0) if snooze_minutes is defined else 0 }}"
+      snooze_duration_text_clean: "{{ snooze_duration_text | default('', true) | string | trim }}"
+      normalized_snooze_duration_text: >-
+        {% if snooze_duration_text_clean != '' %}
+          {{ snooze_duration_text_clean }}
+        {% elif normalized_snooze_minutes > 0 %}
+          {{ normalized_snooze_minutes }} minutes
+        {% else %}
+          
+        {% endif %}
       normalized_request_id: >-
         {{ request_id | default('llm_snooze_alarm_' ~ now().strftime('%Y%m%d%H%M%S%f'), true) }}
       ringing_alarm_count: >-
@@ -54,5 +84,6 @@ sequence:
     data:
       action: snooze_alarm
       alarm_id: "{{ normalized_alarm_id }}"
+      duration_text: "{{ normalized_snooze_duration_text }}"
       request_id: "{{ normalized_request_id }}"
   - sequence: []

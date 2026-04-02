@@ -2093,7 +2093,15 @@ class Daemon:
         alarm_id: Optional[str] = payload.get("id")
         if alarm_id is not None:
             alarm_id = str(alarm_id)
-        minutes = int(payload.get("minutes", self._config.default_snooze_minutes))
+        duration_text_raw = payload.get("duration_text")
+        if duration_text_raw is not None:
+            snooze_seconds = self._parse_duration_seconds(
+                {"duration_text": duration_text_raw},
+                default_seconds=self._config.default_snooze_minutes * 60,
+            )
+            minutes = max(1, int((snooze_seconds + 59) // 60))
+        else:
+            minutes = int(payload.get("minutes", self._config.default_snooze_minutes))
         if minutes < 1:
             raise ValueError("minutes must be ≥ 1")
         snoozed = self._scheduler.snooze(minutes, alarm_id=alarm_id)
