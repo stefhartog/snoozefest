@@ -48,8 +48,8 @@ class Daemon:
         self._running = False
         self._active_request_id: Optional[str] = None
         self._timer_add_seconds = max(1, int(config.timer_add_seconds))
-        self._selected_alarm_id = ""
-        self._selected_timer_id = ""
+        self._selected_alarm_id = "0"
+        self._selected_timer_id = "0"
 
     def _timestamp_payload(self, dt: datetime) -> dict:
         utc_dt = dt.astimezone(timezone.utc)
@@ -2262,9 +2262,10 @@ class Daemon:
     @staticmethod
     def _parse_manager_selected_id(payload: object) -> str:
         if payload is None:
-            return ""
+            return "0"
         if isinstance(payload, str):
-            return payload.strip()
+            raw = payload.strip()
+            return raw or "0"
         if isinstance(payload, (int, float)):
             return str(int(payload))
         raise TypeError("selected ID payload must be a string or number")

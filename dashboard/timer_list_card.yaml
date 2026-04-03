@@ -1,7 +1,18 @@
 visibility:
-  - condition: state
-    entity: text.snoozefest_manager_selected_timer_id
-    state: "0"
+  - condition: or
+    conditions:
+      - condition: state
+        entity: text.snoozefest_manager_selected_timer_id
+        state: "0"
+      - condition: state
+        entity: text.snoozefest_manager_selected_timer_id
+        state: unknown
+      - condition: state
+        entity: text.snoozefest_manager_selected_timer_id
+        state: unavailable
+      - condition: state
+        entity: text.snoozefest_manager_selected_timer_id
+        state: ""
 type: vertical-stack
 cards:
   - type: heading

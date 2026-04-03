@@ -3,6 +3,8 @@ conditions:
   - entity: text.snoozefest_manager_selected_alarm_id
     state_not: "0"
   - entity: text.snoozefest_manager_selected_alarm_id
+    state_not: ""
+  - entity: text.snoozefest_manager_selected_alarm_id
     state_not: unknown
   - entity: text.snoozefest_manager_selected_alarm_id
     state_not: unavailable
