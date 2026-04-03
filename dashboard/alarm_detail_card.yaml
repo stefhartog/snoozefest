@@ -1,7 +1,7 @@
 type: conditional
 conditions:
   - entity: text.snoozefest_manager_selected_alarm_id
-    state_not: ""
+    state_not: "0"
   - entity: text.snoozefest_manager_selected_alarm_id
     state_not: unknown
   - entity: text.snoozefest_manager_selected_alarm_id
@@ -452,7 +452,7 @@ card:
                   service: text.set_value
                   data:
                     entity_id: text.snoozefest_manager_selected_alarm_id
-                    value: ""
+                    value: "0"
             styles:
               name:
                 - color: var(--primary-text-color)
@@ -469,7 +469,7 @@ card:
               service: text.set_value
               data:
                 entity_id: text.snoozefest_manager_selected_alarm_id
-                value: ""
+                value: "0"
             styles:
               name:
                 - color: var(--primary-text-color)

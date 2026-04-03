@@ -1,7 +1,7 @@
 type: conditional
 conditions:
   - entity: text.snoozefest_manager_selected_timer_id
-    state_not: ""
+    state_not: "0"
   - entity: text.snoozefest_manager_selected_timer_id
     state_not: unknown
   - entity: text.snoozefest_manager_selected_timer_id
@@ -14,7 +14,7 @@ card:
         var rawId = states['text.snoozefest_manager_selected_timer_id'] && states['text.snoozefest_manager_selected_timer_id'].state
           ? String(states['text.snoozefest_manager_selected_timer_id'].state).trim()
           : '';
-        if (!rawId || rawId === 'unknown' || rawId === 'unavailable') {
+        if (!rawId || rawId === '0' || rawId === 'unknown' || rawId === 'unavailable') {
           return '';
         }
 
@@ -318,7 +318,7 @@ card:
                       } finally {
                         await h.callService('text', 'set_value', {
                           entity_id: 'text.snoozefest_manager_selected_timer_id',
-                          value: '',
+                          value: '0',
                         });
                       }
                     })();
@@ -505,7 +505,7 @@ card:
                       } finally {
                         await h.callService('text', 'set_value', {
                           entity_id: 'text.snoozefest_manager_selected_timer_id',
-                          value: '',
+                          value: '0',
                         });
                       }
                     })();
@@ -531,7 +531,7 @@ card:
                 service: text.set_value
                 data:
                   entity_id: text.snoozefest_manager_selected_timer_id
-                  value: ""
+                  value: "0"
               styles:
                 name:
                   - color: var(--primary-text-color)

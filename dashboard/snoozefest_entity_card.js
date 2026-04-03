@@ -705,7 +705,7 @@
 		_deriveSelectedEntityId(selector = String(this.config?.tap_sets_timer_id || '')) {
 			if (!selector || !this._hass) return null;
 			const rawId = String(this._hass.states[selector]?.state || '').trim();
-			return rawId && rawId !== 'unknown' && rawId !== 'unavailable' ? rawId : null;
+			return rawId && rawId !== 'unknown' && rawId !== 'unavailable' && rawId !== '0' ? rawId : null;
 		}
 
 		_deriveTimerId() {
