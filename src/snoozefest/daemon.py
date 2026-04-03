@@ -154,6 +154,18 @@ class Daemon:
             "icon": "mdi:delete-sweep",
             "device": self._root_device(),
         }
+        refresh_state_payload = {
+            "name": "Refresh State",
+            "unique_id": self._manager_refresh_state_object_id(),
+            "object_id": self._manager_refresh_state_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "command_topic": f"{self._config.mqtt_topic_prefix}/cmd/state/request",
+            "payload_press": "{}",
+            "icon": "mdi:refresh",
+            "device": self._root_device(),
+        }
         snooze_all_alarms_payload = {
             "name": "Snooze All Ringing Alarms",
             "unique_id": self._manager_snooze_all_alarms_object_id(),
@@ -324,6 +336,7 @@ class Daemon:
         self._mqtt.publish(self._manager_add_alarm_discovery_topic(), add_alarm_payload, retain=True)
         self._mqtt.publish(self._manager_add_timer_discovery_topic(), add_timer_payload, retain=True)
         self._mqtt.publish(self._manager_purge_all_discovery_topic(), purge_all_payload, retain=True)
+        self._mqtt.publish(self._manager_refresh_state_discovery_topic(), refresh_state_payload, retain=True)
         self._mqtt.publish(self._manager_snooze_all_alarms_discovery_topic(), snooze_all_alarms_payload, retain=True)
         self._mqtt.publish(self._manager_dismiss_all_alarms_discovery_topic(), dismiss_all_alarms_payload, retain=True)
         self._mqtt.publish(self._manager_snooze_all_timers_discovery_topic(), snooze_all_timers_payload, retain=True)
@@ -429,6 +442,15 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/button/"
             f"{self._manager_purge_all_object_id()}/config"
+        )
+
+    def _manager_refresh_state_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_refresh_state"
+
+    def _manager_refresh_state_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/button/"
+            f"{self._manager_refresh_state_object_id()}/config"
         )
 
     def _manager_snooze_all_alarms_object_id(self) -> str:
@@ -612,6 +634,9 @@ class Daemon:
     def _alarm_status_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_status"
 
+    def _alarm_id_object_id(self, alarm_id: str) -> str:
+        return f"{self._alarm_object_id(alarm_id)}_id"
+
     def _alarm_remaining_object_id(self, alarm_id: str) -> str:
         return f"{self._alarm_object_id(alarm_id)}_remaining"
 
@@ -705,6 +730,12 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
             f"{self._alarm_status_object_id(alarm_id)}/config"
+        )
+
+    def _alarm_id_discovery_topic(self, alarm_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._alarm_id_object_id(alarm_id)}/config"
         )
 
     def _alarm_remaining_discovery_topic(self, alarm_id: str) -> str:
@@ -805,6 +836,9 @@ class Daemon:
 
     def _alarm_attributes_topic(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/attributes"
+
+    def _alarm_id_state_topic(self, alarm_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/id"
 
     def _alarm_status_state_topic(self, alarm_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/alarm/{alarm_id}/status"
@@ -999,6 +1033,9 @@ class Daemon:
     def _timer_status_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_status"
 
+    def _timer_id_object_id(self, timer_id: str) -> str:
+        return f"{self._timer_object_id(timer_id)}_id"
+
     def _timer_remaining_object_id(self, timer_id: str) -> str:
         return f"{self._timer_object_id(timer_id)}_remaining"
 
@@ -1009,6 +1046,12 @@ class Daemon:
         return (
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
             f"{self._timer_status_object_id(timer_id)}/config"
+        )
+
+    def _timer_id_discovery_topic(self, timer_id: str) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/sensor/"
+            f"{self._timer_id_object_id(timer_id)}/config"
         )
 
     def _timer_label_discovery_topic(self, timer_id: str) -> str:
@@ -1110,6 +1153,9 @@ class Daemon:
     def _timer_status_state_topic(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/status"
 
+    def _timer_id_state_topic(self, timer_id: str) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/id"
+
     def _timer_label_state_topic(self, timer_id: str) -> str:
         return f"{self._config.mqtt_topic_prefix}/state/timer/{timer_id}/label"
 
@@ -1161,6 +1207,17 @@ class Daemon:
 
         for timer in timers:
             timer_id = str(timer["id"])
+            id_payload = {
+                "name": "00 ID",
+                "unique_id": self._timer_id_object_id(timer_id),
+                "object_id": self._timer_id_object_id(timer_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "state_topic": self._timer_id_state_topic(timer_id),
+                "icon": "mdi:identifier",
+                "device": self._timer_device(timer, timer_id),
+            }
             label_payload = {
                 "name": "01 Label",
                 "unique_id": self._timer_label_object_id(timer_id),
@@ -1322,6 +1379,7 @@ class Daemon:
                 "device": self._timer_device(timer, timer_id),
             }
 
+            self._mqtt.publish(self._timer_id_discovery_topic(timer_id), id_payload, retain=True)
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), label_payload, retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), duration_payload, retain=True)
@@ -1343,6 +1401,7 @@ class Daemon:
             self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), activate_payload, retain=True)
             self._mqtt.publish(self._timer_reset_discovery_topic(timer_id), reset_payload, retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), dismiss_payload, retain=True)
+            self._mqtt.publish(self._timer_id_state_topic(timer_id), timer_id, retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), str(timer.get("label", "Timer")), retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), self._timer_duration_entity_value(timer), retain=True)
             self._mqtt.publish(self._timer_temporary_state_topic(timer_id), "ON" if bool(timer.get("temporary", False)) else "OFF", retain=True)
@@ -1358,6 +1417,7 @@ class Daemon:
 
         removed_ids = previous_ids - current_ids
         for timer_id in removed_ids:
+            self._mqtt.publish(self._timer_id_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_label_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic_legacy(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_discovery_topic(timer_id), "", retain=True)
@@ -1379,6 +1439,7 @@ class Daemon:
             self._mqtt.publish(self._timer_activate_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_reset_discovery_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_dismiss_discovery_topic(timer_id), "", retain=True)
+            self._mqtt.publish(self._timer_id_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_label_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_duration_state_topic(timer_id), "", retain=True)
             self._mqtt.publish(self._timer_temporary_state_topic(timer_id), "", retain=True)
@@ -1400,6 +1461,17 @@ class Daemon:
 
         for alarm in alarms:
             alarm_id = str(alarm["id"])
+            id_payload = {
+                "name": "00 ID",
+                "unique_id": self._alarm_id_object_id(alarm_id),
+                "object_id": self._alarm_id_object_id(alarm_id),
+                "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+                "payload_available": "true",
+                "payload_not_available": "false",
+                "state_topic": self._alarm_id_state_topic(alarm_id),
+                "icon": "mdi:identifier",
+                "device": self._alarm_device(alarm, alarm_id),
+            }
             config_payload = {
                 "name": "03 Enabled",
                 "unique_id": self._alarm_object_id(alarm_id),
@@ -1541,6 +1613,7 @@ class Daemon:
                     "icon": "mdi:calendar-week",
                     "device": self._alarm_device(alarm, alarm_id),
                 })
+            self._mqtt.publish(self._alarm_id_discovery_topic(alarm_id), id_payload, retain=True)
             self._mqtt.publish(self._alarm_discovery_topic(alarm_id), config_payload, retain=True)
             self._mqtt.publish(self._alarm_remove_discovery_topic(alarm_id), remove_payload, retain=True)
             self._mqtt.publish(self._alarm_snooze_discovery_topic(alarm_id), snooze_payload, retain=True)
@@ -1566,6 +1639,7 @@ class Daemon:
             self._mqtt.publish(self._alarm_weekdays_discovery_topic(alarm_id), "", retain=True)
             for wd, wd_payload in enumerate(weekday_switch_payloads):
                 self._mqtt.publish(self._alarm_weekday_discovery_topic(alarm_id, wd), wd_payload, retain=True)
+            self._mqtt.publish(self._alarm_id_state_topic(alarm_id), alarm_id, retain=True)
             self._mqtt.publish(self._alarm_enabled_state_topic(alarm_id), "ON" if alarm.get("enabled", True) else "OFF", retain=True)
             self._mqtt.publish(
                 self._alarm_status_state_topic(alarm_id),
@@ -1600,6 +1674,7 @@ class Daemon:
 
         removed_ids = self._published_alarm_entities - current_ids
         for alarm_id in removed_ids:
+            self._mqtt.publish(self._alarm_id_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_remove_discovery_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_snooze_discovery_topic(alarm_id), "", retain=True)
@@ -1632,6 +1707,7 @@ class Daemon:
             self._mqtt.publish(self._alarm_weekdays_state_topic(alarm_id), "", retain=True)
             for wd in range(7):
                 self._mqtt.publish(self._alarm_weekday_state_topic(alarm_id, wd), "", retain=True)
+            self._mqtt.publish(self._alarm_id_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_remaining_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_remaining_friendly_state_topic(alarm_id), "", retain=True)
             self._mqtt.publish(self._alarm_next_day_state_topic(alarm_id), "", retain=True)
