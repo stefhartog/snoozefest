@@ -1,18 +1,18 @@
 type: conditional
 conditions:
-  - entity: input_text.snoozefest_timer_id
+  - entity: text.snoozefest_manager_selected_timer_id
     state_not: ""
-  - entity: input_text.snoozefest_timer_id
+  - entity: text.snoozefest_manager_selected_timer_id
     state_not: unknown
-  - entity: input_text.snoozefest_timer_id
+  - entity: text.snoozefest_manager_selected_timer_id
     state_not: unavailable
 card:
   type: custom:config-template-card
   variables:
     - |-
       (function () {
-        var rawId = states['input_text.snoozefest_timer_id'] && states['input_text.snoozefest_timer_id'].state
-          ? String(states['input_text.snoozefest_timer_id'].state).trim()
+        var rawId = states['text.snoozefest_manager_selected_timer_id'] && states['text.snoozefest_manager_selected_timer_id'].state
+          ? String(states['text.snoozefest_manager_selected_timer_id'].state).trim()
           : '';
         if (!rawId || rawId === 'unknown' || rawId === 'unavailable') {
           return '';
@@ -22,7 +22,7 @@ card:
         return env + '_timer_' + rawId;
       })()
   entities:
-    - input_text.snoozefest_timer_id
+    - text.snoozefest_manager_selected_timer_id
     - ${'text.' + vars[0] + '_duration'}
     - ${'text.' + vars[0] + '_label'}
     - ${'sensor.' + vars[0] + '_status'}
@@ -56,7 +56,7 @@ card:
               entity: ${'text.' + vars[0] + '_label'}
               max_length: 12
               min_length: 0
-              placeholder_text: ${'Timer ' + states['input_text.snoozefest_timer_id'].state}
+              placeholder_text: ${'Timer ' + states['text.snoozefest_manager_selected_timer_id'].state}
               show_success_messages: false
               title: false
               buttons: false
@@ -316,8 +316,8 @@ card:
                           entity_id: target,
                         });
                       } finally {
-                        await h.callService('input_text', 'set_value', {
-                          entity_id: 'input_text.snoozefest_timer_id',
+                        await h.callService('text', 'set_value', {
+                          entity_id: 'text.snoozefest_manager_selected_timer_id',
                           value: '',
                         });
                       }
@@ -503,8 +503,8 @@ card:
                           entity_id: target,
                         });
                       } finally {
-                        await h.callService('input_text', 'set_value', {
-                          entity_id: 'input_text.snoozefest_timer_id',
+                        await h.callService('text', 'set_value', {
+                          entity_id: 'text.snoozefest_manager_selected_timer_id',
                           value: '',
                         });
                       }
@@ -528,9 +528,9 @@ card:
               icon: mdi:check
               tap_action:
                 action: call-service
-                service: input_text.set_value
+                service: text.set_value
                 data:
-                  entity_id: input_text.snoozefest_timer_id
+                  entity_id: text.snoozefest_manager_selected_timer_id
                   value: ""
               styles:
                 name:

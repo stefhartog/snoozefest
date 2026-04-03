@@ -1,6 +1,6 @@
 visibility:
   - condition: state
-    entity: input_text.snoozefest_timer_id
+    entity: text.snoozefest_manager_selected_timer_id
     state: ""
 type: vertical-stack
 cards:
@@ -18,7 +18,7 @@ cards:
         - entity_id: /^sensor\.[a-z0-9_]+_timer_\d+_remaining$/
           options:
             type: custom:snoozefest-entity-card
-            entity: input_text.snoozefest_timer_id
+            entity: text.snoozefest_manager_selected_timer_id
             display_entity: this.entity_id
             mqtt_prefix: snoozefest
             read_only: true
@@ -52,7 +52,7 @@ cards:
             status_color_snoozed: rgba(138, 128, 51,0.3)
             status_color_ringing: rgba(145, 50, 44,0.3)
             input_border_radius: 0.2em
-            tap_sets_timer_id: input_text.snoozefest_timer_id
+            tap_sets_timer_id: text.snoozefest_manager_selected_timer_id
             hold_dismisses: true
             secondary_mode: status
             secondary_anchor: card
@@ -195,8 +195,8 @@ cards:
 
                 await new Promise((resolve) => setTimeout(resolve, 250));
 
-                await hass.callService('input_text', 'set_value', {
-                  entity_id: 'input_text.snoozefest_timer_id',
+                await hass.callService('text', 'set_value', {
+                  entity_id: 'text.snoozefest_manager_selected_timer_id',
                   value: String(nextId),
                 });
               })();

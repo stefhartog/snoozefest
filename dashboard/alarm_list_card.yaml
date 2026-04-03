@@ -1,6 +1,6 @@
 visibility:
   - condition: state
-    entity: input_text.snoozefest_alarm_id
+    entity: text.snoozefest_manager_selected_alarm_id
     state: ""
 type: vertical-stack
 cards:
@@ -15,7 +15,7 @@ cards:
         - entity_id: /^sensor\.[a-z0-9_]+_alarm_\d+_remaining$/
           options:
             type: custom:snoozefest-entity-card
-            entity: input_text.snoozefest_alarm_id
+            entity: text.snoozefest_manager_selected_alarm_id
             display_entity: this.entity_id
             mqtt_prefix: snoozefest
             read_only: true
@@ -51,7 +51,7 @@ cards:
             input_border_radius: 0.2em
             input_padding: 0
             content_justify: left
-            tap_sets_timer_id: input_text.snoozefest_alarm_id
+            tap_sets_timer_id: text.snoozefest_manager_selected_alarm_id
             hold_dismisses: true
             secondary_mode: weekday_smart
             secondary_anchor: card
@@ -243,8 +243,8 @@ cards:
                   return;
                 }
 
-                await getHass().callService('input_text', 'set_value', {
-                  entity_id: 'input_text.snoozefest_alarm_id',
+                await getHass().callService('text', 'set_value', {
+                  entity_id: 'text.snoozefest_manager_selected_alarm_id',
                   value: String(nextId),
                 });
               })();

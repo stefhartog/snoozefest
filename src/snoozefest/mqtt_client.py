@@ -89,6 +89,8 @@ class MQTTClient:
             "timer/activate",
             "timer/dismiss",
             "settings/timer_add_seconds/set",
+            "settings/selected_alarm_id/set",
+            "settings/selected_timer_id/set",
             "state/request",
         ):
             client.subscribe(f"{self._prefix}/cmd/{suffix}")

@@ -48,6 +48,8 @@ class Daemon:
         self._running = False
         self._active_request_id: Optional[str] = None
         self._timer_add_seconds = max(1, int(config.timer_add_seconds))
+        self._selected_alarm_id = ""
+        self._selected_timer_id = ""
 
     def _timestamp_payload(self, dt: datetime) -> dict:
         utc_dt = dt.astimezone(timezone.utc)
@@ -276,6 +278,32 @@ class Daemon:
             "icon": "mdi:alarm",
             "device": self._root_device(),
         }
+        selected_alarm_id_payload = {
+            "name": "Selected Alarm ID",
+            "unique_id": self._manager_selected_alarm_id_object_id(),
+            "object_id": self._manager_selected_alarm_id_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": self._manager_selected_alarm_id_state_topic(),
+            "command_topic": self._manager_selected_alarm_id_command_topic(),
+            "icon": "mdi:identifier",
+            "mode": "text",
+            "device": self._root_device(),
+        }
+        selected_timer_id_payload = {
+            "name": "Selected Timer ID",
+            "unique_id": self._manager_selected_timer_id_object_id(),
+            "object_id": self._manager_selected_timer_id_object_id(),
+            "availability_topic": f"{self._config.mqtt_topic_prefix}/state/online",
+            "payload_available": "true",
+            "payload_not_available": "false",
+            "state_topic": self._manager_selected_timer_id_state_topic(),
+            "command_topic": self._manager_selected_timer_id_command_topic(),
+            "icon": "mdi:identifier",
+            "mode": "text",
+            "device": self._root_device(),
+        }
         timer_add_seconds_payload = {
             "name": "Timer Add Time Seconds",
             "unique_id": self._manager_timer_add_seconds_object_id(),
@@ -306,7 +334,11 @@ class Daemon:
         self._mqtt.publish(self._manager_alarms_glance_discovery_topic(), alarms_glance_payload, retain=True)
         self._mqtt.publish(self._manager_timers_glance_discovery_topic(), timers_glance_payload, retain=True)
         self._mqtt.publish(self._manager_next_alarm_discovery_topic(), next_alarm_payload, retain=True)
+        self._mqtt.publish(self._manager_selected_alarm_id_discovery_topic(), selected_alarm_id_payload, retain=True)
+        self._mqtt.publish(self._manager_selected_timer_id_discovery_topic(), selected_timer_id_payload, retain=True)
         self._mqtt.publish(self._manager_timer_add_seconds_discovery_topic(), timer_add_seconds_payload, retain=True)
+        self._mqtt.publish(self._manager_selected_alarm_id_state_topic(), self._selected_alarm_id, retain=True)
+        self._mqtt.publish(self._manager_selected_timer_id_state_topic(), self._selected_timer_id, retain=True)
         self._mqtt.publish(self._manager_timer_add_seconds_state_topic(), str(self._timer_add_seconds), retain=True)
 
     @staticmethod
@@ -488,6 +520,36 @@ class Daemon:
             f"{self._config.homeassistant_discovery_prefix}/sensor/"
             f"{self._manager_next_alarm_object_id()}/config"
         )
+
+    def _manager_selected_alarm_id_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_selected_alarm_id"
+
+    def _manager_selected_alarm_id_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._manager_selected_alarm_id_object_id()}/config"
+        )
+
+    def _manager_selected_alarm_id_state_topic(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/settings/selected_alarm_id"
+
+    def _manager_selected_alarm_id_command_topic(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}/cmd/settings/selected_alarm_id/set"
+
+    def _manager_selected_timer_id_object_id(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}_manager_selected_timer_id"
+
+    def _manager_selected_timer_id_discovery_topic(self) -> str:
+        return (
+            f"{self._config.homeassistant_discovery_prefix}/text/"
+            f"{self._manager_selected_timer_id_object_id()}/config"
+        )
+
+    def _manager_selected_timer_id_state_topic(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}/state/settings/selected_timer_id"
+
+    def _manager_selected_timer_id_command_topic(self) -> str:
+        return f"{self._config.mqtt_topic_prefix}/cmd/settings/selected_timer_id/set"
 
     def _manager_timer_add_seconds_object_id(self) -> str:
         return f"{self._config.mqtt_topic_prefix}_manager_timer_add_seconds"
@@ -2086,6 +2148,20 @@ class Daemon:
         return False
 
     def _try_handle_manager_setting_command(self, cmd: str, payload: object) -> bool:
+        if cmd == "settings/selected_alarm_id/set":
+            selected_alarm_id = self._parse_manager_selected_id(payload)
+            self._selected_alarm_id = selected_alarm_id
+            self._mqtt.publish(self._manager_selected_alarm_id_state_topic(), self._selected_alarm_id, retain=True)
+            self._ack(cmd, True, "Selected alarm ID updated")
+            return True
+
+        if cmd == "settings/selected_timer_id/set":
+            selected_timer_id = self._parse_manager_selected_id(payload)
+            self._selected_timer_id = selected_timer_id
+            self._mqtt.publish(self._manager_selected_timer_id_state_topic(), self._selected_timer_id, retain=True)
+            self._ack(cmd, True, "Selected timer ID updated")
+            return True
+
         if cmd != "settings/timer_add_seconds/set":
             return False
 
@@ -2106,6 +2182,16 @@ class Daemon:
         self._mqtt.publish(self._manager_timer_add_seconds_state_topic(), str(self._timer_add_seconds), retain=True)
         self._ack(cmd, True, f"Timer add-time updated: {self._timer_add_seconds}s")
         return True
+
+    @staticmethod
+    def _parse_manager_selected_id(payload: object) -> str:
+        if payload is None:
+            return ""
+        if isinstance(payload, str):
+            return payload.strip()
+        if isinstance(payload, (int, float)):
+            return str(int(payload))
+        raise TypeError("selected ID payload must be a string or number")
 
     def _ack(self, cmd: str, success: bool, message: str = "") -> None:
         payload = {"command": cmd, "success": success, "message": message}

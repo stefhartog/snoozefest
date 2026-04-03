@@ -744,7 +744,9 @@
 			if (!this._hass || !this.config.tap_sets_timer_id) return;
 			const id = this._deriveTimerId();
 			if (!id) return;
-			this._hass.callService('input_text', 'set_value', {
+			const selector = String(this.config.tap_sets_timer_id || '');
+			const domain = selector.includes('.') ? selector.split('.')[0] : 'text';
+			this._hass.callService(domain, 'set_value', {
 				entity_id: this.config.tap_sets_timer_id,
 				value: id,
 			});

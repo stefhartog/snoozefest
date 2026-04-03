@@ -1,10 +1,10 @@
 type: conditional
 conditions:
-  - entity: input_text.snoozefest_alarm_id
+  - entity: text.snoozefest_manager_selected_alarm_id
     state_not: ""
-  - entity: input_text.snoozefest_alarm_id
+  - entity: text.snoozefest_manager_selected_alarm_id
     state_not: unknown
-  - entity: input_text.snoozefest_alarm_id
+  - entity: text.snoozefest_manager_selected_alarm_id
     state_not: unavailable
 card:
   type: custom:config-template-card
@@ -12,7 +12,7 @@ card:
     - >-
       (((window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) ||
       'snoozefest')) + '_alarm_' +
-      states['input_text.snoozefest_alarm_id'].state
+      states['text.snoozefest_manager_selected_alarm_id'].state
     - |-
       (function () {
         var labelKey = 'text.' + vars[0] + '_label';
@@ -34,7 +34,7 @@ card:
         return (nextDay ? nextDay + ' at ' : '') + setTime;
       })()
   entities:
-    - input_text.snoozefest_alarm_id
+    - text.snoozefest_manager_selected_alarm_id
     - ${'switch.' + vars[0]}
     - ${'text.' + vars[0] + '_time'}
     - ${'text.' + vars[0] + '_label'}
@@ -68,7 +68,7 @@ card:
               entity: ${'text.' + vars[0] + '_label'}
               max_length: 12
               min_length: 0
-              placeholder_text: ${'Alarm ' + states['input_text.snoozefest_alarm_id'].state}
+              placeholder_text: ${'Alarm ' + states['text.snoozefest_manager_selected_alarm_id'].state}
               show_success_messages: false
               title: false
               buttons: false
@@ -449,9 +449,9 @@ card:
                   data:
                     entity_id: ${'button.' + vars[0] + '_remove'}
                 - action: call-service
-                  service: input_text.set_value
+                  service: text.set_value
                   data:
-                    entity_id: input_text.snoozefest_alarm_id
+                    entity_id: text.snoozefest_manager_selected_alarm_id
                     value: ""
             styles:
               name:
@@ -466,9 +466,9 @@ card:
             icon: mdi:check
             tap_action:
               action: call-service
-              service: input_text.set_value
+              service: text.set_value
               data:
-                entity_id: input_text.snoozefest_alarm_id
+                entity_id: text.snoozefest_manager_selected_alarm_id
                 value: ""
             styles:
               name:
