@@ -181,9 +181,33 @@ action:
           - condition: trigger
             id:
               - set_timer
+          - condition: template
+            value_template: >-
+              {{ (trigger.slots.duration | default('', true) | string | trim) is match('^\\d+$') }}
         sequence:
           - variables:
-              requested_duration: "{{ trigger.slots.duration | default(trigger.slots.minutes | default('')) }}"
+              ambiguous_amount: "{{ trigger.slots.duration | default('', true) | string | trim }}"
+          - set_conversation_response: >-
+              You may have to be more specific in you request. Please try again.
+
+      - conditions:
+          - condition: trigger
+            id:
+              - set_timer
+        sequence:
+          - variables:
+              requested_duration: >-
+                {% set raw = trigger.slots.duration | default('', true) | string | trim %}
+                {% if raw != '' %}
+                  {{ raw }}
+                {% else %}
+                  {% set m = trigger.slots.minutes | default('') | int(0) %}
+                  {% if m > 0 %}
+                    {{ m }} minute{{ '' if m == 1 else 's' }}
+                  {% else %}
+                    
+                  {% endif %}
+                {% endif %}
               timer_request_label: "VA Timer Pending {{ now().strftime('%H%M%S%f') }}"
               op_request_id: "vm_set_timer_{{ now().strftime('%Y%m%d%H%M%S%f') }}"
           - service: script.snoozefest_voice_router
