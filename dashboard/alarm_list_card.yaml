@@ -24,7 +24,7 @@ cards:
             separator_mode: colon
             autosave: false
             color: var(--primary-text-color)
-            font_size: 5
+            font_size: 4.5
             status_opacity_inactive: 0.4
             suffix_font_size: 0.5em
             suffix_opacity: 0.5
@@ -32,7 +32,7 @@ cards:
             suffix_color: var(--secondary-text-color)
             card_border: false
             padding_top: 12px
-            padding_bottom: 12px
+            padding_bottom: 0px
             padding_left: 20px
             padding_right: 20px
             stepper_offset: 0px
@@ -61,6 +61,14 @@ cards:
             secondary_offset_y: 0px
             secondary_font_size: 0.2em
             secondary_opacity: "0.4"
+            tertiary_mode: remaining
+            tertiary_anchor: card
+            tertiary_position: topright
+            tertiary_align: center
+            tertiary_offset_x: "-10px"
+            tertiary_offset_y: 0px
+            tertiary_font_size: 0.2em
+            tertiary_opacity: "0.4"
             secondary_button: true
             secondary_button_icon_on: mdi:toggle-switch-outline
             secondary_button_icon_off: mdi:toggle-switch-off-outline

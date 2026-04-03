@@ -99,6 +99,10 @@
 	- secondary_click_stop_propagation: true | false
 	- secondary_aria_label: free text string
 
+	Tertiary content:
+	- Same options as secondary content, prefixed with tertiary_
+	- Example: tertiary_mode, tertiary_variant, tertiary_anchor, tertiary_position, tertiary_click_action
+
 	Secondary button:
 	- secondary_button: true | false
 	- secondary_button_anchor: content | card
@@ -386,6 +390,7 @@
 				...this._buildStatusConfig(config),
 				...this._buildStyleConfig(config),
 				...this._buildSecondaryConfig(config),
+				...this._buildTertiaryConfig(config),
 				...this._buildSecondaryButtonConfig(config),
 			};
 		}
@@ -537,6 +542,46 @@
 				secondary_click_data: objectValue(config.secondary_click_data),
 				secondary_click_stop_propagation: config.secondary_click_stop_propagation !== false,
 				secondary_aria_label: stringValue(config.secondary_aria_label),
+			};
+		}
+
+		_buildTertiaryConfig(config) {
+			return {
+				tertiary_mode: lowerString(config.tertiary_mode, 'none') || 'none',
+				tertiary_variant: lowerString(config.tertiary_variant, 'text') || 'text',
+				tertiary_text: stringValue(config.tertiary_text, '') || '',
+				tertiary_entity: stringValue(config.tertiary_entity),
+				tertiary_icon: stringValue(config.tertiary_icon, 'mdi:information-outline') || 'mdi:information-outline',
+				tertiary_icon_state_entity: stringValue(config.tertiary_icon_state_entity),
+				tertiary_icon_on: stringValue(config.tertiary_icon_on),
+				tertiary_icon_off: stringValue(config.tertiary_icon_off),
+				tertiary_icon_size: stringValue(config.tertiary_icon_size),
+				tertiary_icon_on_color: stringValue(config.tertiary_icon_on_color),
+				tertiary_icon_off_color: stringValue(config.tertiary_icon_off_color),
+				tertiary_icon_on_opacity: stringValue(config.tertiary_icon_on_opacity),
+				tertiary_icon_off_opacity: stringValue(config.tertiary_icon_off_opacity),
+				tertiary_icon_background: stringValue(config.tertiary_icon_background),
+				tertiary_icon_border_radius: stringValue(config.tertiary_icon_border_radius),
+				tertiary_icon_padding: stringValue(config.tertiary_icon_padding),
+				tertiary_anchor: lowerString(config.tertiary_anchor, 'content') || 'content',
+				tertiary_position: lowerString(config.tertiary_position, 'below') || 'below',
+				tertiary_align: lowerString(config.tertiary_align, null),
+				tertiary_gap: stringValue(config.tertiary_gap),
+				tertiary_font_size: stringValue(config.tertiary_font_size),
+				tertiary_color: stringValue(config.tertiary_color),
+				tertiary_opacity: stringValue(config.tertiary_opacity),
+				tertiary_font_weight: stringValue(config.tertiary_font_weight),
+				tertiary_padding: stringValue(config.tertiary_padding),
+				tertiary_offset_x: stringValue(config.tertiary_offset_x),
+				tertiary_offset_y: stringValue(config.tertiary_offset_y),
+				tertiary_z_index: stringValue(config.tertiary_z_index),
+				tertiary_pointer_events: stringValue(config.tertiary_pointer_events, 'none') || 'none',
+				tertiary_click_action: lowerString(config.tertiary_click_action, 'none') || 'none',
+				tertiary_click_service: stringValue(config.tertiary_click_service),
+				tertiary_click_entity: stringValue(config.tertiary_click_entity),
+				tertiary_click_data: objectValue(config.tertiary_click_data),
+				tertiary_click_stop_propagation: config.tertiary_click_stop_propagation !== false,
+				tertiary_aria_label: stringValue(config.tertiary_aria_label),
 			};
 		}
 
@@ -774,6 +819,10 @@
 			return String(this.config?.secondary_click_action || 'none').toLowerCase() !== 'none';
 		}
 
+		_tertiaryHasClickAction() {
+			return String(this.config?.tertiary_click_action || 'none').toLowerCase() !== 'none';
+		}
+
 		_secondaryButtonHasClickAction() {
 			return String(this.config?.secondary_button_click_action || 'none').toLowerCase() !== 'none';
 		}
@@ -828,6 +877,20 @@
 				this.config.secondary_click_service,
 				this.config.secondary_click_entity,
 				this.config.secondary_click_data,
+			);
+		}
+
+		_onTertiaryClick(ev) {
+			if (!this._hass || !this.config) return;
+			if (this.config.tertiary_click_stop_propagation !== false) {
+				ev.preventDefault();
+				ev.stopPropagation();
+			}
+			this._runSecondaryAction(
+				String(this.config.tertiary_click_action || 'none').toLowerCase(),
+				this.config.tertiary_click_service,
+				this.config.tertiary_click_entity,
+				this.config.tertiary_click_data,
 			);
 		}
 
@@ -1054,8 +1117,18 @@
 			return this._normalizeOverlayPosition(raw, anchor, anchor === 'card' ? 'center' : 'below');
 		}
 
+		_getTertiaryPosition() {
+			const anchor = this._getTertiaryAnchor();
+			const raw = String(this.config?.tertiary_position || (anchor === 'card' ? 'center' : 'below')).toLowerCase();
+			return this._normalizeOverlayPosition(raw, anchor, anchor === 'card' ? 'center' : 'below');
+		}
+
 		_getSecondaryAnchor() {
 			return String(this.config?.secondary_anchor || 'content').toLowerCase() === 'card' ? 'card' : 'content';
+		}
+
+		_getTertiaryAnchor() {
+			return String(this.config?.tertiary_anchor || 'content').toLowerCase() === 'card' ? 'card' : 'content';
 		}
 
 		_getSecondaryButtonAnchor() {
@@ -1104,6 +1177,15 @@
 			return 'center';
 		}
 
+		_getTertiaryAlign() {
+			const align = this.config?.tertiary_align != null ? String(this.config.tertiary_align).toLowerCase() : '';
+			if (align === 'left' || align === 'center' || align === 'right') return align;
+			const position = this._getTertiaryPosition();
+			if (position === 'right' || position === 'topright' || position === 'bottomright' || position === 'centerright') return 'right';
+			if (position === 'left' || position === 'topleft' || position === 'bottomleft' || position === 'centerleft') return 'left';
+			return 'center';
+		}
+
 		_getBinaryState(entityId) {
 			const raw = this._getSecondaryEntityState(entityId).toLowerCase();
 			if (!raw) return null;
@@ -1116,7 +1198,7 @@
 			const isButton = type === 'button';
 			const explicit = isButton
 				? this.config.secondary_button_icon_state_entity
-				: this.config.secondary_icon_state_entity;
+				: (type === 'tertiary' ? this.config.tertiary_icon_state_entity : this.config.secondary_icon_state_entity);
 			if (explicit) return explicit;
 
 			const context = this._resolveEntityContext();
@@ -1200,19 +1282,22 @@
 				.join(' ');
 		}
 
-		_getSecondaryText(currentStatus) {
-			const mode = String(this.config?.secondary_mode || 'none').toLowerCase();
+		_getOverlayText(type, currentStatus) {
+			const prefix = type === 'tertiary' ? 'tertiary' : 'secondary';
+			const mode = String(this.config?.[`${prefix}_mode`] || 'none').toLowerCase();
 			if (mode === 'none') return '';
-			if (mode === 'label') return String(this.config?.secondary_text || '');
+			if (mode === 'label') return String(this.config?.[`${prefix}_text`] || '');
 			if (mode === 'status') return currentStatus ? this._titleCaseWords(currentStatus) : '';
-			if (mode === 'entity') return this._getSecondaryEntityState(this.config?.secondary_entity);
+			if (mode === 'entity') return this._getSecondaryEntityState(this.config?.[`${prefix}_entity`]);
 
 			const { base, kind } = this._resolveEntityContext();
 			if (!base) return '';
 
 			if (mode === 'weekday_smart' || mode === 'smart_weekday') {
+				const statusText = currentStatus ? this._titleCaseWords(currentStatus) : '';
+				const nextDayText = this._getSecondaryEntityState(this._resolveEntityContext().nextDayEntity);
 				if (kind !== 'alarm') {
-					return this._getSecondaryEntityState(this._resolveEntityContext().nextDayEntity);
+					return nextDayText || statusText;
 				}
 				const selected = [];
 				for (let wd = 0; wd < this._resolveEntityContext().weekdaySwitchEntities.length; wd += 1) {
@@ -1221,8 +1306,11 @@
 						selected.push(wd);
 					}
 				}
-				if (selected.length === 0 || selected.length === 7) {
-					return this._getSecondaryEntityState(this._resolveEntityContext().nextDayEntity);
+				if (selected.length === 0) {
+					return nextDayText || statusText;
+				}
+				if (selected.length === 7) {
+					return nextDayText || statusText;
 				}
 				return selected.map((wd) => DAY_LABELS[wd] || '').filter(Boolean).join(' ');
 			}
@@ -1273,12 +1361,13 @@
 
 		_getOverlayBaseDescriptor(type) {
 			const isButton = type === 'button';
+			const isTertiary = type === 'tertiary';
 			const enabled = isButton ? this.config.secondary_button === true : true;
-			const anchor = isButton ? this._getSecondaryButtonAnchor() : this._getSecondaryAnchor();
-			const position = isButton ? this._getSecondaryButtonPosition() : this._getSecondaryPosition();
+			const anchor = isButton ? this._getSecondaryButtonAnchor() : (isTertiary ? this._getTertiaryAnchor() : this._getSecondaryAnchor());
+			const position = isButton ? this._getSecondaryButtonPosition() : (isTertiary ? this._getTertiaryPosition() : this._getSecondaryPosition());
 			const flowPosition = this._getContentFlowPosition(position);
-			const align = isButton ? this._getSecondaryButtonAlign(position) : this._getSecondaryAlign();
-			const clickable = isButton ? this._secondaryButtonHasClickAction() : this._secondaryHasClickAction();
+			const align = isButton ? this._getSecondaryButtonAlign(position) : (isTertiary ? this._getTertiaryAlign() : this._getSecondaryAlign());
+			const clickable = isButton ? this._secondaryButtonHasClickAction() : (isTertiary ? this._tertiaryHasClickAction() : this._secondaryHasClickAction());
 			return {
 				type,
 				enabled,
@@ -1292,14 +1381,19 @@
 
 		_getOverlayStatefulIcon(type, fallbackIcon) {
 			const isButton = type === 'button';
+			const isTertiary = type === 'tertiary';
 			const stateEntity = this._getOverlayStateEntity(type);
 			const state = this._getBinaryState(stateEntity);
 			const color = isButton
 				? (state === 'on' ? this.config.secondary_button_icon_on_color : (state === 'off' ? this.config.secondary_button_icon_off_color : null))
-				: (state === 'on' ? this.config.secondary_icon_on_color : (state === 'off' ? this.config.secondary_icon_off_color : null));
+				: (isTertiary
+					? (state === 'on' ? this.config.tertiary_icon_on_color : (state === 'off' ? this.config.tertiary_icon_off_color : null))
+					: (state === 'on' ? this.config.secondary_icon_on_color : (state === 'off' ? this.config.secondary_icon_off_color : null)));
 			const opacity = isButton
 				? (state === 'on' ? this.config.secondary_button_icon_on_opacity : (state === 'off' ? this.config.secondary_button_icon_off_opacity : null))
-				: (state === 'on' ? this.config.secondary_icon_on_opacity : (state === 'off' ? this.config.secondary_icon_off_opacity : null));
+				: (isTertiary
+					? (state === 'on' ? this.config.tertiary_icon_on_opacity : (state === 'off' ? this.config.tertiary_icon_off_opacity : null))
+					: (state === 'on' ? this.config.secondary_icon_on_opacity : (state === 'off' ? this.config.secondary_icon_off_opacity : null)));
 			const icon = isButton
 				? this._getResolvedStateIcon(
 					this.config.secondary_button_icon || fallbackIcon,
@@ -1308,10 +1402,10 @@
 					this.config.secondary_button_icon_off,
 				)
 				: this._getResolvedStateIcon(
-					this.config.secondary_icon || fallbackIcon,
+					(isTertiary ? this.config.tertiary_icon : this.config.secondary_icon) || fallbackIcon,
 					stateEntity,
-					this.config.secondary_icon_on,
-					this.config.secondary_icon_off,
+					isTertiary ? this.config.tertiary_icon_on : this.config.secondary_icon_on,
+					isTertiary ? this.config.tertiary_icon_off : this.config.secondary_icon_off,
 				);
 			return {
 				stateEntity,
@@ -1374,7 +1468,7 @@
 		_buildSecondaryTextDescriptor(currentStatus) {
 			const descriptor = this._getOverlayBaseDescriptor('secondary');
 			const variant = String(this.config.secondary_variant || 'text').toLowerCase() === 'icon' ? 'icon' : 'text';
-			const text = this._getSecondaryText(currentStatus);
+			const text = this._getOverlayText('secondary', currentStatus);
 			const iconState = this._getOverlayStatefulIcon('secondary', 'mdi:information-outline');
 			const style = this._buildOverlayStyle(descriptor, {
 				fontSize: this.config.secondary_font_size,
@@ -1399,6 +1493,39 @@
 				text,
 				icon: iconState.icon,
 				label: this.config.secondary_aria_label || text || 'Secondary action',
+				style,
+				shouldRender: variant === 'icon' ? Boolean(iconState.icon) : Boolean(text),
+			};
+		}
+
+		_buildTertiaryTextDescriptor(currentStatus) {
+			const descriptor = this._getOverlayBaseDescriptor('tertiary');
+			const variant = String(this.config.tertiary_variant || 'text').toLowerCase() === 'icon' ? 'icon' : 'text';
+			const text = this._getOverlayText('tertiary', currentStatus);
+			const iconState = this._getOverlayStatefulIcon('tertiary', 'mdi:information-outline');
+			const style = this._buildOverlayStyle(descriptor, {
+				fontSize: this.config.tertiary_font_size,
+				baseColor: this.config.tertiary_color,
+				stateColor: variant === 'icon' ? iconState.color : null,
+				opacity: this.config.tertiary_opacity,
+				stateOpacity: variant === 'icon' ? iconState.opacity : null,
+				fontWeight: this.config.tertiary_font_weight,
+				padding: this.config.tertiary_padding,
+				offsetX: this.config.tertiary_offset_x,
+				offsetY: this.config.tertiary_offset_y,
+				zIndex: this.config.tertiary_z_index,
+				pointerEvents: this.config.tertiary_pointer_events,
+				background: variant === 'icon' ? this.config.tertiary_icon_background : null,
+				borderRadius: variant === 'icon' ? this.config.tertiary_icon_border_radius : null,
+				iconSizeVar: variant === 'icon' ? '--stpc-secondary-icon-size' : null,
+				iconSize: variant === 'icon' ? this.config.tertiary_icon_size : null,
+			});
+			return {
+				...descriptor,
+				variant,
+				text,
+				icon: iconState.icon,
+				label: this.config.tertiary_aria_label || text || 'Tertiary action',
 				style,
 				shouldRender: variant === 'icon' ? Boolean(iconState.icon) : Boolean(text),
 			};
@@ -1435,9 +1562,13 @@
 		}
 
 		_buildOverlayDescriptor(type, currentStatus) {
-			return type === 'button'
-				? this._buildSecondaryButtonDescriptor()
-				: this._buildSecondaryTextDescriptor(currentStatus);
+			if (type === 'button') {
+				return this._buildSecondaryButtonDescriptor();
+			}
+			if (type === 'tertiary') {
+				return this._buildTertiaryTextDescriptor(currentStatus);
+			}
+			return this._buildSecondaryTextDescriptor(currentStatus);
 		}
 
 		_renderOverlay(descriptor) {
@@ -1448,7 +1579,9 @@
 			const title = descriptor.text || descriptor.label;
 
 			if (descriptor.clickable) {
-				const handler = descriptor.type === 'button' ? this._onSecondaryButtonClick : this._onSecondaryClick;
+				const handler = descriptor.type === 'button'
+					? this._onSecondaryButtonClick
+					: (descriptor.type === 'tertiary' ? this._onTertiaryClick : this._onSecondaryClick);
 				return html`<button type="button" class="secondary secondary-btn ${descriptor.variant} anchor-${descriptor.anchor}" style="${descriptor.style}" title="${title}" aria-label="${descriptor.label}" @click="${handler}">${content}</button>`;
 			}
 
@@ -1501,41 +1634,51 @@
 			`;
 		}
 
-		_getContentFlowPositionForDescriptors(secondary, secondaryButton) {
-			if (secondary.anchor === 'content' && secondary.shouldRender) {
-				return secondary.flowPosition;
-			}
-			if (secondaryButton.anchor === 'content' && secondaryButton.shouldRender) {
-				return secondaryButton.flowPosition;
+		_getPrimaryContentDescriptor(descriptors) {
+			return (descriptors || []).find((descriptor) => descriptor.anchor === 'content' && descriptor.shouldRender) || null;
+		}
+
+		_getContentFlowPositionForDescriptors(descriptors) {
+			const primary = this._getPrimaryContentDescriptor(descriptors);
+			if (primary) {
+				return primary.flowPosition;
 			}
 			return 'below';
 		}
 
-		_buildContentStyle(secondary, contentFlowPosition) {
+		_buildContentStyle(descriptors, contentFlowPosition) {
+			const primary = this._getPrimaryContentDescriptor(descriptors);
+			const overlayGap = this._getLargestCssSize([this.config.secondary_gap, this.config.tertiary_gap]);
 			return [
-				this.config.secondary_gap != null ? `--stpc-secondary-gap: ${this.config.secondary_gap}` : '',
-				secondary.anchor === 'content' && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && secondary.align === 'left' ? 'align-items: flex-start' : '',
-				secondary.anchor === 'content' && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && secondary.align === 'center' ? 'align-items: center' : '',
-				secondary.anchor === 'content' && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && secondary.align === 'right' ? 'align-items: flex-end' : '',
+				overlayGap != null ? `--stpc-secondary-gap: ${overlayGap}` : '',
+				primary && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && primary.align === 'left' ? 'align-items: flex-start' : '',
+				primary && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && primary.align === 'center' ? 'align-items: center' : '',
+				primary && (contentFlowPosition === 'below' || contentFlowPosition === 'above') && primary.align === 'right' ? 'align-items: flex-end' : '',
 			].filter(Boolean).join('; ');
 		}
 
-		_renderCardContent(mainMarkup, secondary, secondaryButton, currentStatus) {
-			const secondaryMarkup = this._renderOverlay(secondary);
-			const secondaryButtonMarkup = this._renderOverlay(secondaryButton);
-			const contentFlowPosition = this._getContentFlowPositionForDescriptors(secondary, secondaryButton);
-			const contentStyle = this._buildContentStyle(secondary, contentFlowPosition);
+		_renderCardContent(mainMarkup, secondary, tertiary, secondaryButton, currentStatus) {
+			const descriptors = [secondary, tertiary, secondaryButton];
+			const contentFlowPosition = this._getContentFlowPositionForDescriptors(descriptors);
+			const contentStyle = this._buildContentStyle(descriptors, contentFlowPosition);
+			const containerAnchor = descriptors.some((descriptor) => descriptor.anchor === 'content' && descriptor.shouldRender) ? 'content' : 'card';
 			const mainStyle = this._getStatusOpacity(currentStatus) != null ? `opacity: ${this._getStatusOpacity(currentStatus)}` : '';
+			const beforeMarkup = descriptors
+				.filter((descriptor) => descriptor.anchor === 'content' && descriptor.shouldRender && (descriptor.flowPosition === 'above' || descriptor.flowPosition === 'left'))
+				.map((descriptor) => this._renderOverlay(descriptor));
+			const afterMarkup = descriptors
+				.filter((descriptor) => descriptor.anchor === 'content' && descriptor.shouldRender && (descriptor.flowPosition === 'below' || descriptor.flowPosition === 'right'))
+				.map((descriptor) => this._renderOverlay(descriptor));
+			const cardMarkup = descriptors
+				.filter((descriptor) => descriptor.anchor === 'card' && descriptor.shouldRender)
+				.map((descriptor) => this._renderOverlay(descriptor));
 
 			return html`
-				<div class="content anchor-${secondary.anchor} pos-${contentFlowPosition}" style="${contentStyle}">
-					${secondary.anchor === 'content' && secondary.shouldRender && (secondary.flowPosition === 'above' || secondary.flowPosition === 'left') ? secondaryMarkup : ''}
-					${secondaryButton.anchor === 'content' && secondaryButton.shouldRender && (secondaryButton.flowPosition === 'above' || secondaryButton.flowPosition === 'left') ? secondaryButtonMarkup : ''}
+				<div class="content anchor-${containerAnchor} pos-${contentFlowPosition}" style="${contentStyle}">
+					${beforeMarkup}
 					<div class="main" style="${mainStyle}">${mainMarkup}</div>
-					${secondary.anchor === 'content' && secondary.shouldRender && (secondary.flowPosition === 'below' || secondary.flowPosition === 'right') ? secondaryMarkup : ''}
-					${secondaryButton.anchor === 'content' && secondaryButton.shouldRender && (secondaryButton.flowPosition === 'below' || secondaryButton.flowPosition === 'right') ? secondaryButtonMarkup : ''}
-					${secondary.anchor === 'card' && secondary.shouldRender ? secondaryMarkup : ''}
-					${secondaryButton.anchor === 'card' && secondaryButton.shouldRender ? secondaryButtonMarkup : ''}
+					${afterMarkup}
+					${cardMarkup}
 				</div>
 			`;
 		}
@@ -1549,6 +1692,7 @@
 			const currentStatus = this._getCurrentStatus();
 			const cardStyle = this._buildCardStyle(currentStatus);
 			const secondary = this._buildOverlayDescriptor('secondary', currentStatus);
+			const tertiary = this._buildOverlayDescriptor('tertiary', currentStatus);
 			const secondaryButton = this._buildOverlayDescriptor('button', currentStatus);
 			const mainMarkup = this._renderMainMarkup(interactive);
 
@@ -1562,7 +1706,7 @@
 					@pointercancel="${this._onCardPointerCancel}"
 				>
 					${this.config.title ? html`<div class="card-header">${this.config.title}</div>` : ''}
-					${this._renderCardContent(mainMarkup, secondary, secondaryButton, currentStatus)}
+					${this._renderCardContent(mainMarkup, secondary, tertiary, secondaryButton, currentStatus)}
 				</ha-card>
 			`;
 		}

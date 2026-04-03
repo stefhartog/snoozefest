@@ -27,14 +27,14 @@ cards:
             separator_mode: units
             autosave: false
             color: var(--primary-text-color)
-            font_size: 5
+            font_size: 4.5
             suffix_font_size: 0.2em
             suffix_opacity: 0.4
             suffix_padding: 20px 2px 0px 0px
             suffix_color: var(--secondary-text-color)
             card_border: false
             padding_top: 12px
-            padding_bottom: 12px
+            padding_bottom: 0px
             padding_left: 20px
             padding_right: 10px
             stepper_offset: 0px

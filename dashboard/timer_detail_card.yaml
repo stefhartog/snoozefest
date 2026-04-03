@@ -9,18 +9,10 @@ conditions:
 card:
   type: custom:config-template-card
   variables:
-    - |-
-      (function () {
-        var rawId = states['text.snoozefest_manager_selected_timer_id'] && states['text.snoozefest_manager_selected_timer_id'].state
-          ? String(states['text.snoozefest_manager_selected_timer_id'].state).trim()
-          : '';
-        if (!rawId || rawId === '0' || rawId === 'unknown' || rawId === 'unavailable') {
-          return '';
-        }
-
-        var env = (window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) || 'snoozefest';
-        return env + '_timer_' + rawId;
-      })()
+    - >-
+      (((window.SNOOZEFEST_PREFIX && String(window.SNOOZEFEST_PREFIX).trim()) ||
+      'snoozefest')) + '_timer_' +
+      states['text.snoozefest_manager_selected_timer_id'].state
   entities:
     - text.snoozefest_manager_selected_timer_id
     - ${'text.' + vars[0] + '_duration'}
